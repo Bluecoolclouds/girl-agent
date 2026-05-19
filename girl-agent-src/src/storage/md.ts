@@ -346,13 +346,15 @@ export function parseSessionLogTurns(raw: string, fromId?: number, limit = 30): 
     if (user) {
       currentChatMatches = fromId == null || Number(user[2]) === fromId;
       if (currentChatMatches) {
-        turns.push({ role: "user", content: user[3] ?? "", ts: Date.parse(user[1] ?? "") || undefined, fromId: Number(user[2]) });
+        const content = (user[3] ?? "").replace(/\s*<!--[^>]*-->/g, "").trim();
+        turns.push({ role: "user", content, ts: Date.parse(user[1] ?? "") || undefined, fromId: Number(user[2]) });
       }
       continue;
     }
     const assistant = line.match(/^\s*->\s+(?:\[proactive\]\s+)?она:\s*(.*)$/);
     if (assistant && currentChatMatches) {
-      turns.push({ role: "assistant", content: assistant[1] ?? "" });
+      const content = (assistant[1] ?? "").replace(/\s*<!--[^>]*-->/g, "").trim();
+      turns.push({ role: "assistant", content });
     }
   }
   return turns.slice(-limit);
