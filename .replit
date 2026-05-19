@@ -2,7 +2,8 @@ modules = ["nodejs-24", "python-3.11"]
 
 [deployment]
 router = "application"
-deploymentTarget = "gce"
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd girl-agent-src && node_modules/.bin/tsx src/cli.ts --port=5000 --host=0.0.0.0 --no-browser"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
