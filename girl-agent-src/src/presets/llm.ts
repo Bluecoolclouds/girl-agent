@@ -2,6 +2,16 @@ import type { LLMPreset } from "../types.js";
 
 export const LLM_PRESETS: LLMPreset[] = [
   {
+    id: "replit",
+    name: "Replit AI ★",
+    proto: "anthropic",
+    defaultModel: "claude-haiku-4-5",
+    models: ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5"],
+    recommended: true,
+    apiKeyRequired: false,
+    hint: "бесплатно через Replit AI credits — ключ не нужен"
+  },
+  {
     id: "girlai",
     name: "GirlAI",
     proto: "openai",

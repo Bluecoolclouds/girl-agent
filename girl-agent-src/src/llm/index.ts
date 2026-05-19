@@ -434,6 +434,14 @@ function errorMessage(error: unknown): string {
 }
 
 export function makeLLM(cfg: ProfileConfig["llm"]): LLMClient {
-  const inner = cfg.proto === "anthropic" ? new AnthropicLike(cfg) : new OpenAILike(cfg);
+  let effectiveCfg = cfg;
+  if (cfg.presetId === "replit") {
+    effectiveCfg = {
+      ...cfg,
+      apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ?? cfg.apiKey,
+      baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL ?? cfg.baseURL
+    };
+  }
+  const inner = effectiveCfg.proto === "anthropic" ? new AnthropicLike(effectiveCfg) : new OpenAILike(effectiveCfg);
   return new SerializedLLMClient(inner);
 }
