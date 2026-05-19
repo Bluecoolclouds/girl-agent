@@ -7,8 +7,8 @@ export function registerAuthRoutes(r: Router): void {
   r.post("/api/auth/login", ({ body, res }) => {
     const { password } = (body as { password?: string }) ?? {};
     if (!verifyPassword(password ?? "")) throw new HttpError(401, "неверный пароль");
-    createSession(res);
-    return { ok: true };
+    const token = createSession(res);
+    return { ok: true, token };
   });
 
   r.post("/api/auth/logout", ({ req, res }) => {

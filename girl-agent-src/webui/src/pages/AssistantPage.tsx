@@ -125,7 +125,7 @@ export function AssistantPage() {
               const applied = appliedTools.has(toolKey);
               return (
                 <div key={j} style={{ marginTop: 8, padding: "10px 12px", background: "rgba(0,0,0,0.2)", borderRadius: 10, fontFamily: "var(--ga-font-mono)", fontSize: 12 }}>
-                  <div><strong>{tc.tool}</strong>({Object.entries(tc.args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")})</div>
+                  <div><strong>{tc.tool}</strong>({Object.entries(tc.args ?? {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")})</div>
                   <button
                     className={`btn tiny ${applied ? "ghost" : "primary"}`}
                     style={{ marginTop: 8 }}
