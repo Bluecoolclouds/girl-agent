@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "girl-agent WebUI"
+version = "1.0.0"
+id = "artifacts/girl-agent"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21889
+
+[services.development]
+run = "pnpm --filter @workspace/girl-agent run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/girl-agent", "run", "build" ]
+publicDir = "artifacts/girl-agent/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21889"
+BASE_PATH = "/"

@@ -1,0 +1,65 @@
+{
+  "name": "@thesashadev/girl-agent",
+  "version": "0.4.4",
+  "description": "Telegram AI persona engine with memory, schedule, relationship state and MTProto userbot mode.",
+  "type": "module",
+  "bin": {
+    "girl-agent": "dist/cli.js"
+  },
+  "main": "dist/cli.js",
+  "files": [
+    "dist",
+    "templates",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run build:server && npm run build:webui",
+    "build:server": "tsup",
+    "build:termux": "npm run build:server -- --env.NODE_OPTIONS=--max-old-space-size=384 && cd webui && npm install --silent --no-audit --no-fund && npm run build -- --minify=false",
+    "build:webui": "cd webui && npm install --silent --no-audit --no-fund && npm run build",
+    "dev": "tsx src/cli.ts",
+    "dev:webui": "cd webui && npm run dev",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "author": "TheSashaDev (void)",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "telegram",
+    "ai",
+    "agent",
+    "webui",
+    "mcp",
+    "userbot",
+    "llm",
+    "persona",
+    "anthropic",
+    "openai"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "grammy": "^1.30.0",
+    "input": "^1.0.1",
+    "mri": "^1.2.0",
+    "openai": "^4.77.0",
+    "telegram": "^2.26.16",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "ip-address": "^10.2.0"
+  }
+}
