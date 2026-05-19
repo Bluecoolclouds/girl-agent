@@ -131,6 +131,11 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
           const m = event.message;
           if (!m) return;
           if (m.out) return;
+          // Игнорируем сообщения от ботов
+          try {
+            const sender = await m.getSender?.();
+            if (sender && (sender as any).bot === true) return;
+          } catch { /* не критично — продолжаем */ }
           const media = await detectUserbotMedia(client, m);
           const text = m.message ?? "";
           if (!text && !media) return;
