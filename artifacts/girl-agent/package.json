@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "cd ../../girl-agent-src && npm run build:server && npm run build:webui && mkdir -p ../artifacts/girl-agent/dist/public && cp -r dist/webui/. ../artifacts/girl-agent/dist/public/",
+    "build": "cd ../../girl-agent-src && npm run build:server && mkdir -p ../artifacts/girl-agent/dist/public",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
