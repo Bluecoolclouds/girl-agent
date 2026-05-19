@@ -1,32 +1,25 @@
-import { spawn } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import app from "./app";
+import { logger } from "./lib/logger";
 
-const __file = fileURLToPath(import.meta.url);
-const __dir = path.dirname(__file);
-const PROJECT_ROOT = path.resolve(__dir, '..', '..', '..');
-const GIRL_AGENT_DIR = path.join(PROJECT_ROOT, 'girl-agent-src');
+const rawPort = process.env["PORT"];
 
-const child = spawn(
-  'node',
-  [
-    path.join(GIRL_AGENT_DIR, 'dist', 'cli.js'),
-    '--port=8080',
-    '--host=0.0.0.0',
-    '--no-browser',
-  ],
-  {
-    cwd: GIRL_AGENT_DIR,
-    env: process.env,
-    stdio: 'inherit',
+if (!rawPort) {
+  throw new Error(
+    "PORT environment variable is required but was not provided.",
+  );
+}
+
+const port = Number(rawPort);
+
+if (Number.isNaN(port) || port <= 0) {
+  throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+app.listen(port, (err) => {
+  if (err) {
+    logger.error({ err }, "Error listening on port");
+    process.exit(1);
   }
-);
 
-child.on('exit', (code, signal) => {
-  process.exit(code ?? 1);
-});
-
-child.on('error', (err) => {
-  console.error('Failed to start girl-agent-src:', err);
-  process.exit(1);
+  logger.info({ port }, "Server listening");
 });

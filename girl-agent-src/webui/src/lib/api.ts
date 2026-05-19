@@ -93,28 +93,11 @@ class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = "girl_agent_token";
-
-function getStoredToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
-}
-function setStoredToken(t: string): void {
-  try { localStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ }
-}
-function clearStoredToken(): void {
-  try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
-}
-
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (body) headers["Content-Type"] = "application/json";
-  const token = getStoredToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined
   });
   let data: unknown = null;
   try { data = await res.json(); } catch { /* may be empty */ }
@@ -131,12 +114,9 @@ export const api = {
     return req<{ enabled: boolean }>("GET", "/api/auth/status");
   },
   async login(password: string) {
-    const result = await req<{ ok: true; token?: string }>("POST", "/api/auth/login", { password });
-    if (result.token) setStoredToken(result.token);
-    return result;
+    return req<{ ok: true }>("POST", "/api/auth/login", { password });
   },
   async logout() {
-    clearStoredToken();
     return req<{ ok: true }>("POST", "/api/auth/logout");
   },
   async listProfiles() {

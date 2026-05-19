@@ -25,11 +25,10 @@ export function verifyPassword(password: string): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export function createSession(res: http.ServerResponse): string {
+export function createSession(res: http.ServerResponse): void {
   const token = crypto.randomBytes(TOKEN_BYTES).toString("base64url");
   sessions.add(token);
   res.setHeader("Set-Cookie", `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`);
-  return token;
 }
 
 export function clearSession(req: http.IncomingMessage, res: http.ServerResponse): void {
