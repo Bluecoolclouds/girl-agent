@@ -3,7 +3,8 @@ modules = ["nodejs-24", "python-3.11"]
 [deployment]
 router = "application"
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd girl-agent-src && node_modules/.bin/tsx src/cli.ts --port=5000 --host=0.0.0.0 --no-browser"]
+run = ["node", "girl-agent-src/dist/cli.js", "--port=8080", "--host=0.0.0.0", "--no-browser"]
+build = ["bash", "-c", "cd girl-agent-src && npm run build:server && npm run build:webui"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
