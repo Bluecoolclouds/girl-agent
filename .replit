@@ -11,6 +11,28 @@ args = ["pnpm", "store", "prune"]
 env = { "CI" = "true" }
 
 [workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd girl-agent-src && node_modules/.bin/tsx src/cli.ts --port=5000 --host=0.0.0.0 --no-browser"
+waitForPort = 5000
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
