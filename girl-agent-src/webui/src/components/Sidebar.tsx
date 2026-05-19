@@ -9,6 +9,7 @@ const ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "configuration", label: "Конфигурация", icon: "⚙" },
   { id: "memory", label: "Память", icon: "❀" },
   { id: "addons", label: "Аддоны", icon: "◉" },
+  { id: "photos", label: "Фото", icon: "◈" },
   { id: "diagnostics", label: "Диагностика", icon: "✓" }
 ];
 

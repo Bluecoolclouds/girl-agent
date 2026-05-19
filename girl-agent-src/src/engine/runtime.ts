@@ -25,6 +25,7 @@ import { mineUnminedDailyLogs } from "./memory-palace.js";
 import { describeIncomingMedia, imagePartFromMedia, memeDetectionInstruction } from "./media.js";
 import { looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
 import { addStickerToLibrary, pickSticker } from "./stickers.js";
+import { pickPhoto } from "./photos.js";
 import { EventEmitter } from "node:events";
 import { applyLLMUpdate, describeLLM } from "../config/llm-update.js";
 import { injectTypos, pickTypoIntensity } from "./typos.js";
@@ -631,6 +632,23 @@ export class Runtime extends EventEmitter {
     const requestedMedia = this.requestedOutgoingMedia(m.text);
     if (requestedMedia) {
       const scope = isPrimary ? "primary" : "acquaintance";
+      // Если просят фото и есть библиотека — шлём реальное фото
+      if (requestedMedia === "photo" && this.tg.sendPhoto) {
+        try {
+          const photo = await pickPhoto(this.cfg, incomingText);
+          if (photo) {
+            await this.tg.setTyping(m.chatId, true).catch(() => {});
+            await sleep(800 + Math.random() * 1200);
+            await this.tg.sendPhoto(m.chatId, photo.filePath, photo.caption);
+            this.emit("event", { type: "info", text: `sent photo: ${photo.filePath}`, chatId: m.chatId } as RuntimeEvent);
+            await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> sent photo ${photo.filePath}`, typeof m.chatId === "number" ? m.chatId : undefined);
+            return;
+          }
+        } catch (e) {
+          this.emit("event", { type: "error", text: `sendPhoto failed: ${silentErrorLabel(e)}` } as RuntimeEvent);
+        }
+      }
+      // Фото нет в библиотеке (или другой тип медиа) — генерируем отказ
       let bubbles: string[] = [];
       try {
         bubbles = await this.generateOutgoingMediaRefusal(requestedMedia, incomingText, scope);

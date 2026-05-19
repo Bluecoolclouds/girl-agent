@@ -9,6 +9,7 @@ import { LogsPage } from "./pages/LogsPage";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { MemoryPage } from "./pages/MemoryPage";
 import { AddonsPage } from "./pages/AddonsPage";
+import { PhotosPage } from "./pages/PhotosPage";
 import { AssistantPage } from "./pages/AssistantPage";
 import { RelationshipPage } from "./pages/RelationshipPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
@@ -45,6 +46,7 @@ export function App() {
             {tab === "configuration" && <ConfigurationPage />}
             {tab === "memory" && <MemoryPage />}
             {tab === "addons" && <AddonsPage />}
+            {tab === "photos" && <PhotosPage />}
             {tab === "assistant" && <AssistantPage />}
             {tab === "relationship" && <RelationshipPage />}
             {tab === "diagnostics" && <DiagnosticsPage />}

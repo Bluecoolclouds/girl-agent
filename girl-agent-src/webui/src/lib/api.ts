@@ -210,6 +210,31 @@ export const api = {
     return req<{ ok: true; addon: InstalledAddon }>("PUT", `/api/addons/${encodeURIComponent(id)}/settings`, { values });
   },
 
+  async listPhotos(slug: string) {
+    return req<{ files: { name: string; size: number; tags: string[]; caption?: string }[]; index: string }>("GET", `/api/profiles/${encodeURIComponent(slug)}/photos`);
+  },
+  async uploadPhoto(slug: string, file: File) {
+    const headers: Record<string, string> = { "x-filename": encodeURIComponent(file.name) };
+    const token = localStorage.getItem("girl_agent_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`/api/profiles/${encodeURIComponent(slug)}/photos/upload`, {
+      method: "POST",
+      headers,
+      body: file,
+      credentials: "include",
+    });
+    let data: unknown = null;
+    try { data = await res.json(); } catch { /* */ }
+    if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? `${res.status}`);
+    return data as { ok: true; name: string };
+  },
+  async updatePhotosIndex(slug: string, index: string) {
+    return req<{ ok: true }>("PUT", `/api/profiles/${encodeURIComponent(slug)}/photos/index`, { index });
+  },
+  async deletePhoto(slug: string, filename: string) {
+    return req<{ ok: true }>("DELETE", `/api/profiles/${encodeURIComponent(slug)}/photos/${encodeURIComponent(filename)}`);
+  },
+
   async assistantChat(profileSlug: string | undefined, messages: { role: string; content: string }[]) {
     return req<{ reply: string; toolCalls: { tool: string; args: Record<string, unknown> }[] }>("POST", "/api/assistant/chat", { profileSlug, messages });
   },

@@ -64,6 +64,7 @@ export interface TgAdapter {
   readHistory?(chatId: number | string): Promise<void>;
   reportSpam?(chatId: number | string): Promise<void>;
   sendSticker?(chatId: number | string, fileId: string): Promise<void>;
+  sendPhoto?(chatId: number | string, filePath: string, caption?: string): Promise<void>;
   deleteMessages?(chatId: number | string, messageIds: number[], revoke?: boolean): Promise<void>;
   /** Возвращает информацию о самом боте/юзерботе: username и отображаемое имя в ТГ. */
   getSelf?(): { username?: string; displayName?: string };

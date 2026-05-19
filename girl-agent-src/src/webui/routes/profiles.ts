@@ -343,6 +343,73 @@ export function registerProfileRoutes(r: Router): void {
     return { ok: true, busySchedule: generated.busySchedule };
   });
 
+  // Фото-библиотека
+  r.get("/api/profiles/:slug/photos", async ({ params }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const dir = path.join(profileDir(slug), "photos");
+    await fs.mkdir(dir, { recursive: true });
+    const indexPath = path.join(dir, "index.md");
+    let index = "";
+    try { index = await fs.readFile(indexPath, "utf8"); } catch { index = ""; }
+    let files: { name: string; size: number; tags: string[]; caption?: string }[] = [];
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      const imgFiles = entries.filter(e => e.isFile() && /\.(jpg|jpeg|png|webp)$/i.test(e.name));
+      files = await Promise.all(imgFiles.map(async e => {
+        const st = await fs.stat(path.join(dir, e.name));
+        const line = index.split(/\r?\n/).find(l => l.startsWith(e.name));
+        const [, tagsRaw = "", caption] = (line ?? "").split("|").map(x => x.trim());
+        return { name: e.name, size: st.size, tags: tagsRaw ? tagsRaw.split(",").map(x => x.trim()).filter(Boolean) : [], caption: caption || undefined };
+      }));
+    } catch { files = []; }
+    return { files, index };
+  });
+
+  r.post("/api/profiles/:slug/photos/upload", async ({ params, req }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const dir = path.join(profileDir(slug), "photos");
+    await fs.mkdir(dir, { recursive: true });
+    const filename = decodeURIComponent(String(req.headers["x-filename"] ?? "photo.jpg")).replace(/[^a-zA-Z0-9._-]/g, "_");
+    if (!/\.(jpg|jpeg|png|webp)$/i.test(filename)) throw new HttpError(400, "только jpg/png/webp");
+    const chunks: Buffer[] = [];
+    let total = 0;
+    await new Promise<void>((resolve, reject) => {
+      req.on("data", (c: Buffer) => { total += c.length; if (total > 20 * 1024 * 1024) { reject(new HttpError(413, "файл слишком большой (макс 20MB)")); req.destroy(); return; } chunks.push(c); });
+      req.on("end", resolve);
+      req.on("error", reject);
+    });
+    const dest = path.join(dir, filename);
+    await fs.writeFile(dest, Buffer.concat(chunks));
+    return { ok: true, name: filename };
+  });
+
+  r.put("/api/profiles/:slug/photos/index", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const { index } = (body as { index?: string }) ?? {};
+    if (typeof index !== "string") throw new HttpError(400, "index required");
+    const dir = path.join(profileDir(slug), "photos");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, "index.md"), index, "utf8");
+    return { ok: true };
+  });
+
+  r.delete("/api/profiles/:slug/photos/:filename", async ({ params }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const filename = (params.filename ?? "").replace(/[^a-zA-Z0-9._-]/g, "_");
+    if (!/\.(jpg|jpeg|png|webp)$/i.test(filename)) throw new HttpError(400, "invalid filename");
+    const p = path.join(profileDir(slug), "photos", filename);
+    try { await fs.unlink(p); } catch { throw new HttpError(404, "file not found"); }
+    return { ok: true };
+  });
+
   // Diagnostics: which preset id? get the list
   r.get("/api/presets/llm-detect", async ({ searchParams }) => {
     const id = searchParams.get("id") ?? "";

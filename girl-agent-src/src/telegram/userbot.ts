@@ -270,6 +270,10 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       const peer = await resolvePeer(chatId);
       await client.sendFile(peer, { file: fileId });
     },
+    async sendPhoto(chatId, filePath, caption) {
+      const peer = await resolvePeer(chatId);
+      await client.sendFile(peer, { file: filePath, caption: caption ?? "" });
+    },
     async setTyping(chatId, on) {
       if (!on) return;
       try {
