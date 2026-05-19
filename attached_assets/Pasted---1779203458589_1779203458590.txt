@@ -1,0 +1,221 @@
+О проекте
+Она не отвечает на каждое сообщение. Иногда читает и молчит. Иногда ставит реакцию. Иногда отвечает через час, потому что была занята или просто не хотела.
+
+Это не баг. Так задумано.
+
+girl-agent — движок ИИ-персоны для Telegram. Не промпт. Не GPTs. Не плагин. Это полноценный агент со своим состоянием: расписание дня, паттерн присутствия, сон, память на месяцы вперёд, конфликт-система, пять счётчиков отношений, девять стадий сближения. Поведение собирается из этих слоёв, а не из одного system_prompt.
+
+Содержание
+Быстрый старт
+Linux / macOS / WSL — одной командой
+Windows — через npx
+Если уже есть Node ≥ 22
+Docker (для серверов)
+Что под капотом
+Почему не просто GPTs или промпт
+Документация
+Безопасность
+Лицензия
+Changelog
+Быстрый старт
+Linux / macOS / WSL — одной командой
+Без Node на машине, без sudo:
+
+curl -fsSL https://raw.githubusercontent.com/TheSashaDev/girl-agent/master/scripts/install.sh | sh
+Что произойдёт:
+
+определит OS + arch (linux x64/arm64, macos x64/arm64, wsl);
+если есть Docker → поставит Docker-обёртку (полная изоляция от системы);
+иначе → скачает официальный Node.js 22 LTS в ~/.local/share/girl-agent/runtime/ и поставит туда же @thesashadev/girl-agent (системный Node не трогается);
+положит shim girl-agent в ~/.local/bin/girl-agent;
+ничего не пишется в /usr/local/, sudo не нужен.
+Дальше:
+
+girl-agent                  # интерактивный визард первичной настройки
+girl-agent --profile=arina  # запустить готовый профиль
+girl-agent server --help    # серверный режим (без TTY, для systemd / cron / CI)
+Опции установщика:
+
+curl -fsSL .../install.sh | sh -s -- --docker        # форсировать Docker
+curl -fsSL .../install.sh | sh -s -- --local         # форсировать локальную Node
+curl -fsSL .../install.sh | sh -s -- --version=0.4.1 # конкретную версию пакета
+Удалить: rm -rf ~/.local/share/girl-agent ~/.local/bin/girl-agent.
+
+Windows — через npx (рекомендуем)
+Самый быстрый способ. Без установщика, без WSL, без Docker.
+
+Скачай и поставь Node.js 22 LTS (.msi-инсталлер, галочка Add to PATH).
+
+В PowerShell:
+
+npx @thesashadev/girl-agent
+Первый запуск скачает пакет (~30 МБ) и откроет визард прямо в PowerShell. WebUI поднимется на http://localhost:3000.
+
+Хочешь короче — поставь глобально:
+
+npm install -g @thesashadev/girl-agent
+girl-agent
+Нужен системный лоток и автозапуск? Есть нативный десктоп-клиент на Rust — готовые бинари в Releases.
+
+Если уже есть Node ≥ 22
+npx @thesashadev/girl-agent
+npx @thesashadev/girl-agent --profile=arina
+Или глобально:
+
+npm install -g @thesashadev/girl-agent
+girl-agent
+Docker (для серверов)
+Интерактивная первичная настройка (визард внутри контейнера):
+
+docker run -it --rm -v girl-agent-data:/data ghcr.io/thesashadev/girl-agent:latest
+Headless (для systemd / docker-compose / k8s) — сначала готовим конфиг, потом запускаем без TTY:
+
+# 1) шаблон конфига
+docker run --rm ghcr.io/thesashadev/girl-agent:latest server --print-config > bot.json
+
+# 2) отредактировать bot.json (token, api-key)
+
+# 3) поднять в фоне
+docker run -d --name girl-agent --restart=unless-stopped \
+  -v girl-agent-data:/data \
+  -v $PWD/bot.json:/config/bot.json:ro \
+  ghcr.io/thesashadev/girl-agent:latest \
+  server --config /config/bot.json --headless
+Или совсем без файла, через env-vars:
+
+docker run -d --name girl-agent --restart=unless-stopped \
+  -v girl-agent-data:/data \
+  -e GIRL_AGENT_MODE=bot \
+  -e GIRL_AGENT_TOKEN=... \
+  -e GIRL_AGENT_API_PRESET=claudehub \
+  -e GIRL_AGENT_API_KEY=... \
+  -e GIRL_AGENT_NAME='Аня' -e GIRL_AGENT_AGE=22 \
+  ghcr.io/thesashadev/girl-agent:latest \
+  server --headless
+Готовые шаблоны (можно скопировать прямо из бинаря):
+
+girl-agent server --print-config    # bot.json
+girl-agent server --print-systemd   # /etc/systemd/system/girl-agent.service
+girl-agent server --print-docker    # Dockerfile / compose / k8s snippets
+И в корне: docker-compose.example.yml.
+
+Из исходников:
+
+git clone https://github.com/TheSashaDev/girl-agent.git
+cd girl-agent
+npm install
+npm run dev
+Что под капотом
+Поведение собирается из нескольких слоёв, а не из одного промпта.
+
+Слой	Что делает
+📱	Presence	Она не всегда онлайн. Паттерн присутствия зависит от персонажа: кто-то в телефоне круглые сутки, кто-то заходит раз в час, кто-то только вечером.
+😴	Sleep	Ночью спит — можно разбудить через :wake, но без команды шанс ответа низкий.
+📅	Daily-life	У каждого дня есть расписание: пары, работа, дорога, свободное время. Если на занятиях — телефон недоступен.
+❤️	Relationship	Пять счётчиков: интерес, доверие, симпатия, раздражение, толер.кринжа. Меняются от каждого диалога.
+📈	Stages	9 стадий сближения: «дала тг, но холодная» → «давно вместе». Стадия влияет на тепло, флирт, длину ответов.
+⚠️	Conflict	Если давить, спамить или нарушать границы — включается конфликт. Может замолчать на часы или дни.
+🧠	Memory	Важные события пишутся в long-term.md и всплывают в будущих диалогах.
+🚫	Anti-AI	Промпт запрещает markdown, «конечно», «я понимаю», эмодзи-ряды, вопросы в конце и всё что палит ChatGPT.
+👤	Userbot mode	Настоящий Telegram-аккаунт через MTProto. Умеет читать, ставить реакции, печатать, удалять и редактировать. Выглядит как живой человек.
+🗓	Agenda	Бот сам планирует проактивные сообщения: пожелать удачи на собес, спросить как прошла встреча, поздравить с днём рождения.
+Подробный разбор каждого слоя →
+
+Почему не просто GPTs или промпт
+Вариантов сделать «девушку в Telegram» несколько — от костыльных до полноценных. Разберём что есть и где дыры.
+
+ChatGPT GPTs — кастомный бот внутри ChatGPT с system prompt
+OpenClaw + prompt — фреймворк для AI-ассистентов с личностью в markdown
+HeatherBot — локальный userbot, persona в YAML, 4-слойная память
+Character.AI — закрытый сервис для AI-переписки
+girl-agent — движок с несколькими слоями состояния
+Presence — паттерны присутствия (частота, офлайн, вероятность ответа)
+Sleep — время сна, night wake chance
+Daily-life — расписание, занятость, приоритеты
+Relationship stages — met-irl-got-tg → convinced → dating-stable → long-term
+Relationship score — интерес, доверие, симпатия, раздражение, толер.кринжа
+Conflict — если давить/спамить, включается конфликт, может замолчать
+Memory — важные события в long-term.md, всплывают в диалогах
+Anti-AI — промпт запрещает markdown, «конечно», «я понимаю», эмодзи-ряды
+Userbot mode — умеет читать, реагировать, печатать, удалять, редактировать
+Agenda — бот планирует действия, живёт своей жизнью
+Итог: поведение собирается из состояния, а не из текстовых инструкций.
+
+Безопасность
+⚠️ Не публикуй: data/, config.json, sessionString, API-ключи.
+
+🔒 Для userbot-режима используй отдельный тестовый аккаунт — Telegram может забанить основной за подозрительную активность.
+
+Подробнее: Security & Privacy →
+
+Лицензия
+📄 Source-available — исходный код открыт для личного тестирования, оценки и вкладов.
+
+Разрешено	Запрещено без письменного разрешения
+✅ Клонировать и запускать локально	❌ Коммерческое использование
+✅ Создавать issues и PR-ы	❌ Платный хостинг
+✅ Изучать код и экспериментировать	❌ Перепродажа
+❌ Публичные конкурирующие клоны
+❌ Использование кода в коммерческих продуктах
+📜 Полный текст: LICENSE.
+
+About
+ИИ-девушка с человеческим поведением: сон, настроение, расписание, память, стадии отношений и конфликты. Userbot mode через MTProto — реагирует, печатает, ставит реакции. Anti-AI промпт убирает ChatGPT-повадки. Не чат-бот — персонаж с состоянием.
+
+Resources
+ Readme
+License
+ View license
+Contributing
+ Contributing
+Security policy
+ Security policy
+ Activity
+Stars
+ 298 stars
+Watchers
+ 7 watching
+Forks
+ 36 forks
+Report repository
+Releases
+ 24 tags
+Packages
+1
+girl-agent
+Contributors
+6
+@TheSashaDev
+@devin-ai-integration[bot]
+@github-actions[bot]
+@k1gs
+@google-labs-jules[bot]
+@cognition-team
+Languages
+TypeScript
+57.0%
+ 
+MDX
+23.4%
+ 
+Rust
+14.8%
+ 
+CSS
+2.9%
+ 
+Shell
+1.0%
+ 
+JavaScript
+0.5%
+ 
+Other
+0.4%
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
