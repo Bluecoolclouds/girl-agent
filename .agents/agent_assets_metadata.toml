@@ -1,2 +1,7 @@
 uploads = []
-outputs = []
+
+[[outputs]]
+id = "OZQ3dOQzEuSkMHYKgs1DJ"
+uri = "file://CHANGES.md"
+type = "text"
+title = "CHANGES.md — журнал всех изменений"
