@@ -1597,7 +1597,42 @@ export class Runtime extends EventEmitter {
       this.stageStats.set(decision.next, { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() });
       this.emit("event", { type: "info", text: `stage ${oldStage} → ${decision.next} (${decision.reason})` } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `[stage-transition] ${oldStage} → ${decision.next} (${decision.reason})`, fromId);
+      if (decision.direction === "up") {
+        await this.sendOwnerStageNotification(fromId, oldStage, decision.next, rel.score, decision.reason).catch(() => {});
+      }
     } catch { /* swallow */ }
+  }
+
+  private async sendOwnerStageNotification(
+    contactId: number,
+    oldStage: string,
+    newStage: string,
+    score: import("../types.js").RelationshipScore,
+    reason: string
+  ): Promise<void> {
+    const notifyId = this.cfg.notifyOwnerId ?? this.cfg.ownerId;
+    if (!notifyId) return;
+    const STAGE_LABELS: Record<string, string> = {
+      "met-irl-got-tg": "познакомились",
+      "tg-given-cold": "холодный ❄️",
+      "tg-given-warming": "прогревается 🌡",
+      "convinced": "тёплый 🔥",
+      "first-date-done": "горячий 💰",
+      "dating-early": "покупатель 💳",
+      "dating-stable": "постоянный ⭐",
+      "long-term": "VIP 👑",
+      "dumped": "заблокирован ❌",
+    };
+    const label = (s: string) => STAGE_LABELS[s] ?? s;
+    const text = [
+      `🔔 girl-agent: смена стадии`,
+      `Профиль: ${this.cfg.name} (${this.cfg.slug})`,
+      `Контакт ID: ${contactId}`,
+      `${label(oldStage)} → ${label(newStage)}`,
+      `Причина: ${reason}`,
+      `Интерес: ${score.interest} | Доверие: ${score.trust} | Влечение: ${score.attraction}`,
+    ].join("\n");
+    await this.tg.sendText(notifyId, text).catch(() => {});
   }
 
   // ============================================================================

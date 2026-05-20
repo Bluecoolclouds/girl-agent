@@ -81,6 +81,7 @@ export function registerProfileRoutes(r: Router): void {
     if (!incoming || typeof incoming !== "object") throw new HttpError(400, "invalid body");
     const merged: ProfileConfig = { ...cur, ...incoming, slug: cur.slug };
     if (incoming.ownerId !== undefined) merged.ownerId = normalizeOwnerId(incoming.ownerId);
+    if (incoming.notifyOwnerId !== undefined) merged.notifyOwnerId = normalizeOwnerId(incoming.notifyOwnerId);
     if (incoming.telegram) {
       merged.telegram = {
         ...cur.telegram,

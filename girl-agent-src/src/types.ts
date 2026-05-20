@@ -135,6 +135,8 @@ export interface ProfileConfig {
   /** @deprecated MCP настройки скрыты из UI; внешние расширения ставятся через addons. */
   mcp?: { id: string; secrets: Record<string, string> }[];
   ownerId?: number; // tg user id of the human (set on first message in practice / fallback)
+  /** Telegram ID для уведомлений о прогреве контактов. Если не задан — уведомления не отправляются. */
+  notifyOwnerId?: number;
   privacy?: PrivacyMode;
   createdAt: string;
   /** Часы сна (0-23). sleepFrom — когда ложится, sleepTo — когда просыпается. Может пересекать полночь. */

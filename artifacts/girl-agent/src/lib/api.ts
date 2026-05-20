@@ -14,6 +14,7 @@ export interface ProfileConfig {
   telegram: { botToken?: string; apiId?: number; apiHash?: string; sessionString?: string; phone?: string; useWSS?: boolean; proxy?: string };
   mcp?: { id: string; secrets: Record<string, string> }[];
   ownerId?: number;
+  notifyOwnerId?: number;
   privacy?: "owner-only" | "allow-strangers";
   createdAt: string;
   sleepFrom: number; sleepTo: number; nightWakeChance: number;

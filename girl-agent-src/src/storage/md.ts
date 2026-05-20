@@ -92,6 +92,7 @@ export async function readConfig(slug: string): Promise<ProfileConfig | null> {
     const parsed = JSON.parse(raw) as Partial<ProfileConfig>;
     const communication = normalizeCommunicationProfile(parsed);
     const ownerId = normalizeOwnerId(parsed.ownerId);
+    const notifyOwnerId = normalizeOwnerId(parsed.notifyOwnerId);
     const ignoreTendency = normalizeIgnoreTendency(parsed.ignoreTendency);
     return {
       sleepFrom: 23,
@@ -101,6 +102,7 @@ export async function readConfig(slug: string): Promise<ProfileConfig | null> {
       busySchedule: [],
       ...parsed,
       ownerId,
+      notifyOwnerId,
       ignoreTendency,
       communication
     } as ProfileConfig;
@@ -112,9 +114,13 @@ export async function readConfig(slug: string): Promise<ProfileConfig | null> {
 export async function writeConfig(cfg: ProfileConfig): Promise<void> {
   await ensureProfile(cfg.slug);
   const ownerId = normalizeOwnerId(cfg.ownerId ?? process.env.GIRL_AGENT_OWNER_ID);
-  const normalized = ownerId === undefined
-    ? { ...cfg, ownerId: undefined, ignoreTendency: normalizeIgnoreTendency(cfg.ignoreTendency) }
-    : { ...cfg, ownerId, ignoreTendency: normalizeIgnoreTendency(cfg.ignoreTendency) };
+  const notifyOwnerId = normalizeOwnerId(cfg.notifyOwnerId);
+  const normalized = {
+    ...cfg,
+    ownerId: ownerId ?? undefined,
+    notifyOwnerId: notifyOwnerId ?? undefined,
+    ignoreTendency: normalizeIgnoreTendency(cfg.ignoreTendency),
+  };
   await fs.writeFile(
     path.join(profileDir(cfg.slug), "config.json"),
     JSON.stringify(normalized, null, 2),

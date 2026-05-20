@@ -173,6 +173,11 @@ export function ConfigurationPage() {
           <label>Owner ID (Telegram user id)</label>
           <input className="input" type="number" value={merged.ownerId ?? ""} onChange={e => pf("ownerId", Number(e.target.value) || undefined)} placeholder="напиши боту /start чтобы он сообщил твой id" />
         </div>
+        <div className="form-row">
+          <label>Notify ID (уведомления о прогреве)</label>
+          <input className="input" type="number" value={merged.notifyOwnerId ?? ""} onChange={e => pf("notifyOwnerId", Number(e.target.value) || undefined)} placeholder="Telegram ID для уведомлений — если пусто, уведомления выключены" />
+          <div className="hint">Когда контакт переходит на более тёплую стадию — бот пришлёт уведомление на этот ID. Если оставить пустым — уведомления выключены.</div>
+        </div>
       </div>
 
       <div className="card">
