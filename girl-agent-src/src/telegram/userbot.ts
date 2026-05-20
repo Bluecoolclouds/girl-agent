@@ -1,4 +1,5 @@
 import { TelegramClient, Api } from "telegram";
+import bigInt from "big-integer";
 import { StringSession } from "telegram/sessions/index.js";
 import type { ProfileConfig } from "../types.js";
 import type { IncomingMedia, TgAdapter } from "./index.js";
@@ -268,7 +269,22 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
     },
     async sendSticker(chatId, fileId) {
       const peer = await resolvePeer(chatId);
-      await client.sendFile(peer, { file: fileId });
+      if (fileId.startsWith("gramjs:")) {
+        const parts = fileId.slice(7).split(":");
+        const docId = bigInt(parts[0] ?? "0");
+        const accessHash = bigInt(parts[1] ?? "0");
+        const fileReference = parts[2] ? Buffer.from(parts[2], "base64") : Buffer.alloc(0);
+        await client.invoke(new Api.messages.SendMedia({
+          peer,
+          media: new Api.InputMediaDocument({
+            id: new Api.InputDocument({ id: docId, accessHash, fileReference }),
+          }),
+          message: "",
+          randomId: bigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)),
+        }));
+      } else {
+        await client.sendFile(peer, { file: fileId });
+      }
     },
     async sendPhoto(chatId, filePath, caption) {
       const peer = await resolvePeer(chatId);
@@ -397,6 +413,12 @@ async function detectUserbotMedia(client: TelegramClient, message: any): Promise
     if (isSticker) {
       const stickerAttr = attrs.find((a: any) => a.className === "DocumentAttributeSticker");
       const out: IncomingMedia = { kind: "sticker", caption, mimeType, emoji: stickerAttr?.alt };
+      if (doc?.id != null && doc?.accessHash != null) {
+        const fileRef = doc.fileReference
+          ? Buffer.from(doc.fileReference as Buffer).toString("base64")
+          : "";
+        out.fileId = `gramjs:${String(doc.id)}:${String(doc.accessHash)}:${fileRef}`;
+      }
       if (mimeType?.startsWith("image/")) {
         try {
           const downloaded = await client.downloadMedia(message, {});
