@@ -163,7 +163,7 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
           trimIncomingCache();
           // === replyTo: достаём текст цитируемого сообщения ===
           let replyToText: string | undefined;
-          const replyToMsgId = m.replyTo?.replyToMsgId ?? m.replyTo?.className === "MessageReplyHeader" ? m.replyTo?.replyToMsgId : undefined;
+          const replyToMsgId = m.replyTo?.replyToMsgId;
           if (replyToMsgId) {
             try {
               const msgs = await client.getMessages(isPrivate ? fromId : chatId, { ids: [replyToMsgId] });
