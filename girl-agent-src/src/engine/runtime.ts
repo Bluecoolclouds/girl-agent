@@ -70,7 +70,7 @@ export class Runtime extends EventEmitter {
   private tg!: TgAdapter;
   private histories = new Map<string, ConversationTurn[]>();
   private paused = false;
-  /** Установлен когда API вернул quota/billing/auth ошибку. Бот уходит полностью в офлайн — не отвечает, не читает, не появляется онлайн. Сбрасывается через :reset. */
+  /** Установлен когда API вернул quota/billing/auth ошибку. Бот уходит полностью в офлайн — не отвечает, не читает, не появляется онлайн. Сбрасывается через :resume (НЕ :reset — тот стирает relationship). */
   private quotaExhausted = false;
   private agendaTimer?: NodeJS.Timeout;
   private dailyTimer?: NodeJS.Timeout;
@@ -162,7 +162,7 @@ export class Runtime extends EventEmitter {
   }
 
   pause() { this.paused = true; }
-  resume() { this.paused = false; }
+  resume() { this.paused = false; this.quotaExhausted = false; }
 
   private histKey(chatId: number | string) { return String(chatId); }
 
@@ -916,7 +916,7 @@ export class Runtime extends EventEmitter {
       if (isQuotaExhaustedError(e)) {
         // Токены/баланс кончились — полностью уходим в офлайн, НЕ читаем сообщения, НЕ отвечаем.
         this.quotaExhausted = true;
-        this.emit("event", { type: "error", text: `quota-exhausted: баланс/токены исчерпаны — бот ушёл в офлайн. Пополни баланс и выполни :reset` } as RuntimeEvent);
+        this.emit("event", { type: "error", text: `quota-exhausted: баланс/токены исчерпаны — бот ушёл в офлайн. Пополни баланс и выполни :resume` } as RuntimeEvent);
         if (this.tg?.updateOnlineStatus) await this.tg.updateOnlineStatus(false).catch(() => {});
         return;
       }
@@ -1121,7 +1121,6 @@ export class Runtime extends EventEmitter {
   }
 
   async cmdReset(): Promise<string> {
-    this.quotaExhausted = false;
     if (this.cfg.stage === "dumped") this.cfg.stage = "tg-given-cold";
     await writeConfig(this.cfg);
     await writeRelationship(this.cfg.slug, {
