@@ -13,6 +13,7 @@ import { registerAddonRoutes } from "./routes/addons.js";
 import { registerAssistantRoutes } from "./routes/assistant.js";
 import { registerTgAuthRoutes } from "./routes/tg-auth.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerMediaRoutes } from "./routes/media.js";
 import { isAuthorized } from "./auth.js";
 import { listProfiles, readConfig } from "../storage/md.js";
 
@@ -86,6 +87,7 @@ function buildRouter(): Router {
   registerAddonRoutes(r);
   registerAssistantRoutes(r);
   registerTgAuthRoutes(r);
+  registerMediaRoutes(r);
   return r;
 }
 

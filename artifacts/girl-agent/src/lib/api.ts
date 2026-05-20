@@ -232,8 +232,29 @@ export const api = {
     return req<{ sessionString: string; apiId?: number; apiHash?: string }>(
       "POST", "/api/tg/userbot/verify-password", payload
     );
-  }
+  },
+
+  async listPhotos(slug: string) {
+    return req<{ photos: PhotoEntry[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/photos`);
+  },
+  async uploadPhoto(slug: string, payload: { filename: string; data: string; mimeType: string; tags: string[]; caption: string }) {
+    return req<{ ok: true; filename: string }>("POST", `/api/profiles/${encodeURIComponent(slug)}/photos`, payload);
+  },
+  async updatePhoto(slug: string, filename: string, payload: { tags?: string[]; caption?: string }) {
+    return req<{ ok: true }>("PUT", `/api/profiles/${encodeURIComponent(slug)}/photos/${encodeURIComponent(filename)}`, payload);
+  },
+  async deletePhoto(slug: string, filename: string) {
+    return req<{ ok: true }>("DELETE", `/api/profiles/${encodeURIComponent(slug)}/photos/${encodeURIComponent(filename)}`);
+  },
 };
+
+export interface PhotoEntry {
+  filename: string;
+  tags: string[];
+  caption: string;
+  url: string;
+  isVideo: boolean;
+}
 
 export function logsSocket(slug: string, onEvent: (e: { type: string; text?: string; t: number }) => void): () => void {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";

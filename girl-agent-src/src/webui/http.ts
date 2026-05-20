@@ -85,7 +85,7 @@ export async function readBody(req: http.IncomingMessage): Promise<unknown> {
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => {
       len += c.length;
-      if (len > 32 * 1024 * 1024) {
+      if (len > 150 * 1024 * 1024) {
         reject(new HttpError(413, "request too large"));
         req.destroy();
         return;
