@@ -104,6 +104,7 @@ export function LogsPage() {
             <button className="btn tiny" onClick={() => void runCommand(activeSlug, "why")}>:why</button>
             <button className="btn tiny" onClick={() => void runCommand(activeSlug, "wake")}>:wake</button>
             <button className="btn tiny" onClick={() => void runCommand(activeSlug, "debug")}>:debug</button>
+            <button className="btn tiny" onClick={() => void runCommand(activeSlug, "resume")}>:resume</button>
             <button className="btn tiny danger" onClick={() => { if (confirm("Сбросить relationship?")) void runCommand(activeSlug, "reset"); }}>:reset</button>
           </div>
         </div>
