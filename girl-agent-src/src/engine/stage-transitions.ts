@@ -1,20 +1,19 @@
 /**
- * Умная автоматическая смена стадий отношений.
+ * Автоматическая смена стадий воронки продаж контента.
  *
- * Цель: повысить стадию когда score сигналит о тёплом, длительном контакте,
- * и понизить (или отшить) когда score уходит в минус и в логах долго нет
- * признаков восстановления.
+ * Воронка:
+ *  1. met-irl-got-tg   — холодный подписчик
+ *  2. tg-given-cold    — первый контакт, чуть ответила
+ *  3. tg-given-warming — прогрев, разговорилась
+ *  4. convinced        — тёплый, доверяет, интересуется
+ *  5. first-date-done  — горячий, сам спросил про контент
+ *  6. dating-early     — покупатель (оплатил/готов)
+ *  7. dating-stable    — постоянный покупатель
+ *  8. long-term        — VIP, давний фанат
+ *  9. dumped           — заблокирован
  *
- * Решение НЕ рандомное:
- *  - есть пороги по score (interest/trust/attraction/annoyance)
- *  - есть требование "минимум N сообщений с момента входа в стадию"
- *    (чтобы не прыгало между стадиями за один тик)
- *  - есть бан-листы: например, никогда не повышаем со стадии "dumped"
- *    автоматически
- *  - есть приоритет понижения: если очень плохо — сначала понизить, иначе
- *    проверяем повышение
- *
- * Возвращает следующую stage или null, если не нужно менять.
+ * Переходы вверх — по interest/trust/attraction + минимум сообщений.
+ * Переход вниз — если annoyance высокий или интерес падает.
  */
 
 import type { RelationshipScore, StageId } from "../types.js";
@@ -22,13 +21,9 @@ import type { RelationshipScore, StageId } from "../types.js";
 export interface StageTransitionContext {
   currentStage: StageId;
   score: RelationshipScore;
-  /** Сколько сообщений ОТ НЕЁ за время этой стадии. */
   herMessagesInStage: number;
-  /** Сколько сообщений ОТ НЕГО за время этой стадии. */
   hisMessagesInStage: number;
-  /** Сколько раз она проигнорила его за стадию (чтобы не повышать «через игнор»). */
   ignoresInStage: number;
-  /** Опционально — есть ли активный конфликт. */
   hasActiveConflict?: boolean;
 }
 
@@ -53,45 +48,27 @@ function stageIndex(id: StageId): number {
   return STAGE_ORDER.indexOf(id);
 }
 
-/**
- * Решает, нужно ли передвинуть стадию.
- *
- * Возвращает null если стадия должна остаться той же.
- */
 export function decideStageTransition(ctx: StageTransitionContext): StageTransitionResult | null {
-  // "dumped" — терминальная стадия, автоматически из неё не выходим
-  // (только через :reset или специальную логику в runtime).
   if (ctx.currentStage === "dumped") return null;
 
   const { score } = ctx;
   const idx = stageIndex(ctx.currentStage);
   if (idx < 0) return null;
 
-  // === Сначала проверяем ПОНИЖЕНИЕ (downgrade) ===
-  // Уход в "dumped" — runtime обрабатывает отдельно (там auto-dumped по
-  // экстремальному annoyance). Тут — мягкое понижение.
+  // Понижение — приоритетнее
   const wantsDowngrade = wantsDowngradeFor(ctx);
   if (wantsDowngrade && idx > 0) {
     const next = STAGE_ORDER[idx - 1]!;
-    return {
-      next,
-      reason: wantsDowngrade,
-      direction: "down"
-    };
+    return { next, reason: wantsDowngrade, direction: "down" };
   }
 
-  // === Затем UPGRADE ===
-  // Не повышаем во время активного конфликта.
+  // Повышение — только без активного конфликта
   if (ctx.hasActiveConflict) return null;
 
   const wantsUpgrade = wantsUpgradeFor(ctx);
   if (wantsUpgrade && idx < STAGE_ORDER.length - 1) {
     const next = STAGE_ORDER[idx + 1]!;
-    return {
-      next,
-      reason: wantsUpgrade,
-      direction: "up"
-    };
+    return { next, reason: wantsUpgrade, direction: "up" };
   }
 
   return null;
@@ -100,25 +77,23 @@ export function decideStageTransition(ctx: StageTransitionContext): StageTransit
 function wantsDowngradeFor(ctx: StageTransitionContext): string | null {
   const { score, currentStage, herMessagesInStage, ignoresInStage } = ctx;
 
-  // Условие: annoyance высокий, interest/trust сильно просели — и за стадию
-  // прошло достаточно времени чтобы такое утвердилось (>= 8 её сообщений).
   if (
-    score.annoyance >= 60 &&
-    score.interest <= -10 &&
-    score.trust <= 10 &&
-    herMessagesInStage >= 8
+    score.annoyance >= 55 &&
+    score.interest <= -5 &&
+    score.trust <= 15 &&
+    herMessagesInStage >= 6
   ) {
-    return `annoyance ${score.annoyance}, interest ${score.interest}, trust ${score.trust} — отношения регрессируют`;
+    return `annoyance ${score.annoyance}, interest ${score.interest} — потерял интерес или ведёт себя неадекватно`;
   }
 
-  // Если она ВСЁ ВРЕМЯ игнорит на тёплой стадии — это тоже признак деградации.
+  // Много игноров на тёплых стадиях — регрессия
   if (
     ["convinced", "first-date-done", "dating-early", "dating-stable", "long-term"].includes(currentStage) &&
-    ignoresInStage >= 12 &&
-    ignoresInStage >= ctx.hisMessagesInStage * 0.7 &&
-    score.interest < 20
+    ignoresInStage >= 10 &&
+    ignoresInStage >= ctx.hisMessagesInStage * 0.65 &&
+    score.interest < 25
   ) {
-    return `${ignoresInStage} игноров за стадию из ${ctx.hisMessagesInStage} его сообщений — теряет интерес`;
+    return `${ignoresInStage} игноров — потерял активность, интерес падает`;
   }
 
   return null;
@@ -126,58 +101,56 @@ function wantsDowngradeFor(ctx: StageTransitionContext): string | null {
 
 function wantsUpgradeFor(ctx: StageTransitionContext): string | null {
   const { score, currentStage, herMessagesInStage } = ctx;
-  // Минимум сообщений от неё, прежде чем повысить стадию: 6.
-  // Это даёт LLM время поработать на стадии, а не «прыгать» при 1 хорошем
-  // сообщении.
-  const MIN_HER = 6;
+  const MIN_HER = 5;
   if (herMessagesInStage < MIN_HER) return null;
 
-  // Для разных стадий — разные пороги (требования становятся выше с уровнем).
   switch (currentStage) {
     case "met-irl-got-tg": {
-      // Только что встретились → начала отвечать тепло.
-      if (score.interest >= 30 && score.attraction >= 20 && score.annoyance < 20) {
-        return `interest ${score.interest}, attraction ${score.attraction} — оттаяла`;
+      // Холодный → первый контакт: написал несколько раз, есть минимальный интерес
+      if (score.interest >= 20 && score.annoyance < 20) {
+        return `interest ${score.interest} — начал общаться, стоит ответить чуть теплее`;
       }
-      // Если игнорит и интерес не растёт — должен спуститься в "tg-given-cold"
-      // (но это понижение, его обработает downgrade).
       return null;
     }
     case "tg-given-cold": {
-      if (score.interest >= 25 && score.trust >= 10 && score.annoyance < 25) {
-        return `interest ${score.interest}, trust ${score.trust} — стала отвечать осторожно`;
+      // Первый контакт → прогрев: продолжает писать, не спамер
+      if (score.interest >= 30 && score.trust >= 10 && score.annoyance < 25) {
+        return `interest ${score.interest}, trust ${score.trust} — регулярно пишет, можно открыться чуть больше`;
       }
       return null;
     }
     case "tg-given-warming": {
-      if (score.interest >= 40 && score.trust >= 25 && score.attraction >= 30 && score.annoyance < 20) {
-        return `interest ${score.interest}, trust ${score.trust}, attraction ${score.attraction} — стабильно общается`;
+      // Прогрев → тёплый: активный диалог, интерес к ней
+      if (score.interest >= 42 && score.trust >= 22 && score.attraction >= 28 && score.annoyance < 20) {
+        return `interest ${score.interest}, trust ${score.trust} — тёплый диалог, пора намекнуть на контент`;
       }
       return null;
     }
     case "convinced": {
-      // Здесь нужно как минимум 10 её сообщений, чтобы решить что было
-      // свидание / договорённость о нём.
-      if (herMessagesInStage >= 10 && score.attraction >= 50 && score.trust >= 35 && score.interest >= 50) {
-        return `attraction ${score.attraction}, trust ${score.trust} — пошли на первое свидание`;
+      // Тёплый → горячий: он сам задаёт вопросы про неё/контент
+      if (herMessagesInStage >= 8 && score.attraction >= 48 && score.trust >= 35 && score.interest >= 50) {
+        return `attraction ${score.attraction}, trust ${score.trust} — проявил интерес к контенту, время предложить`;
       }
       return null;
     }
     case "first-date-done": {
-      if (herMessagesInStage >= 12 && score.attraction >= 65 && score.trust >= 50 && score.interest >= 60) {
-        return `attraction ${score.attraction}, trust ${score.trust} — отношения завязались`;
+      // Горячий → покупатель: выразил готовность платить / оплатил
+      if (herMessagesInStage >= 6 && score.attraction >= 60 && score.trust >= 48 && score.interest >= 58) {
+        return `attraction ${score.attraction}, trust ${score.trust} — готов к покупке`;
       }
       return null;
     }
     case "dating-early": {
-      if (herMessagesInStage >= 25 && score.trust >= 70 && score.attraction >= 65 && score.annoyance < 15) {
-        return `trust ${score.trust}, attraction ${score.attraction}, ${herMessagesInStage} сообщений — стабильная пара`;
+      // Покупатель → постоянный: несколько покупок или длительная активность
+      if (herMessagesInStage >= 20 && score.trust >= 65 && score.attraction >= 62 && score.annoyance < 15) {
+        return `trust ${score.trust}, ${herMessagesInStage} сообщений — постоянный покупатель`;
       }
       return null;
     }
     case "dating-stable": {
-      if (herMessagesInStage >= 60 && score.trust >= 80 && score.interest >= 55) {
-        return `trust ${score.trust}, ${herMessagesInStage} сообщений — давно вместе`;
+      // Постоянный → VIP: очень высокое доверие, долгая история
+      if (herMessagesInStage >= 50 && score.trust >= 80 && score.interest >= 60) {
+        return `trust ${score.trust}, ${herMessagesInStage} сообщений — VIP-фанат`;
       }
       return null;
     }
@@ -186,11 +159,6 @@ function wantsUpgradeFor(ctx: StageTransitionContext): string | null {
   }
 }
 
-/**
- * Хелпер: подсчёт сообщений в стадии можно делать через trackers, но базово —
- * по relationship.md / log. Эту функцию рантайм может вызывать раз в N тиков.
- */
 export function shouldRunStageTransitionCheck(messagesSinceLastCheck: number): boolean {
-  // Проверка не на каждое сообщение — раз в 5.
   return messagesSinceLastCheck > 0 && messagesSinceLastCheck % 5 === 0;
 }
