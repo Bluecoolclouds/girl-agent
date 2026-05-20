@@ -89,6 +89,16 @@ export function isTechnicalError(e: unknown): boolean {
   return TECHNICAL_ERROR_RE.test(msg);
 }
 
+/**
+ * Возвращает true если ошибка означает исчерпание токенов/баланса — quota или auth.
+ * В отличие от rate-limit (временная пауза), эти ошибки означают что продолжать нельзя
+ * до пополнения баланса. Бот должен полностью уйти в офлайн.
+ */
+export function isQuotaExhaustedError(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e ?? "")).toLowerCase();
+  return /quota|balance|billing|insufficient_quota|credit|credits|401|403|unauthorized|forbidden/.test(msg);
+}
+
 export function silentErrorLabel(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? "unknown");
   if (isTechnicalError(e)) return `llm/provider unavailable: ${technicalErrorKind(msg)}`;

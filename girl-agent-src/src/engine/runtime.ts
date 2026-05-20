@@ -23,7 +23,7 @@ import { closeCurrentSession, closeStaleSessions } from "./daily-summarizer.js";
 import { loadRealismContext, maybeAdvanceRelationshipTimeline, recordInteractionMemory } from "./realism.js";
 import { mineUnminedDailyLogs } from "./memory-palace.js";
 import { describeIncomingMedia, imagePartFromMedia, memeDetectionInstruction } from "./media.js";
-import { looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
+import { isQuotaExhaustedError, looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
 import { addStickerToLibrary, pickSticker } from "./stickers.js";
 import { pickPhoto } from "./photos.js";
 import { EventEmitter } from "node:events";
@@ -70,6 +70,8 @@ export class Runtime extends EventEmitter {
   private tg!: TgAdapter;
   private histories = new Map<string, ConversationTurn[]>();
   private paused = false;
+  /** Установлен когда API вернул quota/billing/auth ошибку. Бот уходит полностью в офлайн — не отвечает, не читает, не появляется онлайн. Сбрасывается через :reset. */
+  private quotaExhausted = false;
   private agendaTimer?: NodeJS.Timeout;
   private dailyTimer?: NodeJS.Timeout;
   private onlineHeartbeatTimer?: NodeJS.Timeout;
@@ -566,7 +568,7 @@ export class Runtime extends EventEmitter {
   }
 
   private async onlineHeartbeatTick(): Promise<void> {
-    if (this.paused || !this.tg?.updateOnlineStatus) return;
+    if (this.paused || this.quotaExhausted || !this.tg?.updateOnlineStatus) return;
     // Активный диалог = недавно отвечала кому-либо
     const now = Date.now();
     let mostRecentReply = 0;
@@ -595,6 +597,8 @@ export class Runtime extends EventEmitter {
   private async handleIncoming(m: IncomingMessage): Promise<void> {
     try {
       if (this.paused) return;
+      // Токены/баланс исчерпаны — не читаем, не отвечаем, не появляемся онлайн.
+      if (this.quotaExhausted) return;
       if (!m.isPrivate) return; // персонаж работает только в личных чатах — и для bot, и для userbot
       // === Ранние ветки: удаление (Task #15) и эмодзи-реакция (Task #16) ===
       if (m.deletion) {
@@ -909,6 +913,13 @@ export class Runtime extends EventEmitter {
       reply = sanitizeModelReply(await this.llm.chat(messages, { temperature: 0.95, maxTokens: 3500 }));
     } catch (e) {
       // техническая ошибка LLM — не вытягиваем юзера ретраем, молча уходим в ignored
+      if (isQuotaExhaustedError(e)) {
+        // Токены/баланс кончились — полностью уходим в офлайн, НЕ читаем сообщения, НЕ отвечаем.
+        this.quotaExhausted = true;
+        this.emit("event", { type: "error", text: `quota-exhausted: баланс/токены исчерпаны — бот ушёл в офлайн. Пополни баланс и выполни :reset` } as RuntimeEvent);
+        if (this.tg?.updateOnlineStatus) await this.tg.updateOnlineStatus(false).catch(() => {});
+        return;
+      }
       this.emit("event", { type: "error", text: silentErrorLabel(e) } as RuntimeEvent);
       await this.sendSafeFallback(chatId, hist, scope, "llm-error");
       return;
@@ -1110,6 +1121,7 @@ export class Runtime extends EventEmitter {
   }
 
   async cmdReset(): Promise<string> {
+    this.quotaExhausted = false;
     if (this.cfg.stage === "dumped") this.cfg.stage = "tg-given-cold";
     await writeConfig(this.cfg);
     await writeRelationship(this.cfg.slug, {
