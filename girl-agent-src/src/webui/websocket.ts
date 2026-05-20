@@ -58,7 +58,8 @@ export function attachWebSockets(server: http.Server): void {
         let score: unknown = null;
         let stage: string | undefined;
         try {
-          const rel = await readRelationship(slug);
+          const cfg2 = await (await import("../storage/md.js")).readConfig(slug);
+          const rel = await readRelationship(slug, cfg2?.ownerId ?? undefined);
           score = rel.score;
           stage = rel.stage;
         } catch { /* no relationship yet */ }

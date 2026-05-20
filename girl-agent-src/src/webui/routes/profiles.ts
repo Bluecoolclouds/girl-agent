@@ -194,7 +194,7 @@ export function registerProfileRoutes(r: Router): void {
     const slug = params.slug ?? "";
     const cfg = await readConfig(slug);
     if (!cfg) throw new HttpError(404, "profile not found");
-    const rel = await readRelationship(slug);
+    const rel = await readRelationship(slug, cfg.ownerId ?? undefined);
     const stage = findStage(rel.stage);
     return { stage: { id: stage.id, num: stage.num, label: stage.label }, score: rel.score };
   });

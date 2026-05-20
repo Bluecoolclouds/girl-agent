@@ -213,6 +213,7 @@ export interface BuildPromptCtx {
   tgUsername?: string;
   /** Отображаемое имя в ТГ (может отличаться от persona) */
   tgDisplayName?: string;
+  fromId?: number;
 }
 
 export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx = {}): Promise<string> {
@@ -220,10 +221,10 @@ export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx 
     readMd(cfg.slug, "persona.md"),
     readMd(cfg.slug, "speech.md"),
     readMd(cfg.slug, "communication.md"),
-    readRelationship(cfg.slug)
+    readRelationship(cfg.slug, ctx.fromId)
   ]);
   const isAcquaintance = ctx.relationshipScope === "acquaintance";
-  const effectiveStageId = isAcquaintance ? "tg-given-cold" : cfg.stage;
+  const effectiveStageId = isAcquaintance ? "tg-given-cold" : (relRaw.stage || cfg.stage);
   const rel = isAcquaintance
     ? { ...relRaw, stage: effectiveStageId, score: { interest: 0, trust: 0, attraction: 0, annoyance: 0, cringe: 0 } }
     : relRaw;

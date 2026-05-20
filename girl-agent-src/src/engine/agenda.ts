@@ -359,7 +359,7 @@ export async function ensureAutonomousAgenda(
   }
 
   const stage = findStage(cfg.stage);
-  const rel = await readRelationship(cfg.slug);
+  const rel = await readRelationship(cfg.slug, cfg.ownerId ?? undefined);
   const persona = (await readMd(cfg.slug, "persona.md")).slice(0, 900);
   const speech = (await readMd(cfg.slug, "speech.md")).slice(0, 600);
   const palace = await searchPalaceDrawers(cfg, history.slice(-8).map(m => m.content).join("\n"), 8);

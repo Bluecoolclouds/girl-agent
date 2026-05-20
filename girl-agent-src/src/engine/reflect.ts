@@ -23,7 +23,8 @@ export async function maybeReflect(
   llm: LLMClient,
   cfg: ProfileConfig,
   recent: { role: "user" | "assistant"; content: string }[],
-  conflict: ConflictState | null = null
+  conflict: ConflictState | null = null,
+  fromId?: number
 ): Promise<void> {
   if (recent.length < 6) return;
   const transcript = recent.slice(-12).map(m => `${m.role === "user" ? "он" : cfg.name}: ${m.content}`).join("\n");
@@ -58,9 +59,9 @@ ${transcript}
         `\n\n## ${new Date().toISOString().slice(0, 16)}\n` + parsed.newFacts.map((f: string) => `- ${f}`).join("\n"));
     }
     if (parsed.feelingShift) {
-      const rel = await readRelationship(cfg.slug);
+      const rel = await readRelationship(cfg.slug, fromId);
       const note = `\n\n## ${new Date().toISOString().slice(0, 16)}\n${parsed.feelingShift}`;
-      await writeRelationship(cfg.slug, { ...rel, notes: (rel.notes || "") + note });
+      await writeRelationship(cfg.slug, { ...rel, notes: (rel.notes || "") + note }, fromId);
     }
   } catch {
     /* swallow */

@@ -16,6 +16,8 @@ interface BehaviorContext {
   activeDialog?: boolean;
   /** Последние входящие сообщения с их TG message ID — для реакций. */
   recentIncomingIds?: Array<{ messageId: number; text: string }>;
+  /** ID контакта — для per-contact relationship */
+  fromId?: number;
 }
 
 function reactionMenu(stage: string, score: { attraction: number; interest: number; annoyance: number; cringe: number }): string {
@@ -114,7 +116,7 @@ export async function behaviorTick(
   ctx: BehaviorContext = {}
 ): Promise<BehaviorTickResult> {
   const stage = findStage(cfg.stage);
-  const rel = await readRelationship(cfg.slug);
+  const rel = await readRelationship(cfg.slug, ctx.fromId);
   const communication = normalizeCommunicationProfile(cfg);
   const ignoreTendency = normalizeIgnoreTendency(cfg.ignoreTendency);
   const state = `stage=${cfg.stage} (${stage.label})\nscore=${JSON.stringify(rel.score)}\nbase_ignore=${stage.defaults.ignoreChance}\nbase_delay=${stage.defaults.replyDelaySec.join("..")}s\n${communicationDecisionState(communication)}\n${ignoreTendencyPrompt(ignoreTendency)}`;

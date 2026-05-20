@@ -254,7 +254,7 @@ export class Runtime extends EventEmitter {
       stage: this.cfg.stage,
       score: { interest: 0, trust: 0, attraction: 0, annoyance: 0, cringe: 0 },
       notes: `stage: ${this.cfg.stage}\n<!--score:{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0}-->\n`
-    });
+    }, fromId);
     await writeMd(this.cfg.slug, "memory/long-term.md", "");
     await clearConflict(this.cfg.slug);
     this.histories.clear();
@@ -462,7 +462,7 @@ export class Runtime extends EventEmitter {
     }
   }
 
-  private async generateJailbreakReaction(incomingText: string, scope: RelationshipScope): Promise<string[]> {
+  private async generateJailbreakReaction(incomingText: string, scope: RelationshipScope, fromId?: number): Promise<string[]> {
     const realism = scope === "primary" ? await loadRealismContext(this.cfg, incomingText) : undefined;
     const sys = await buildSystemPrompt(this.cfg, {
       dailyLife: this.dailyLife,
@@ -471,7 +471,8 @@ export class Runtime extends EventEmitter {
       committedPrimary: this.primaryIsCommitted(),
       realism,
       tgUsername: this.tgSelf.username,
-      tgDisplayName: this.tgSelf.displayName
+      tgDisplayName: this.tgSelf.displayName,
+      fromId
     });
     const reply = sanitizeModelReply(await this.llm.chat([
       {
@@ -484,7 +485,7 @@ export class Runtime extends EventEmitter {
     return bubbles.length ? bubbles : [];
   }
 
-  private async generateOutgoingMediaRefusal(kind: "photo" | "video" | "voice" | "video_note", incomingText: string, scope: RelationshipScope): Promise<string[]> {
+  private async generateOutgoingMediaRefusal(kind: "photo" | "video" | "voice" | "video_note", incomingText: string, scope: RelationshipScope, fromId?: number): Promise<string[]> {
     const realism = scope === "primary" ? await loadRealismContext(this.cfg, incomingText) : undefined;
     const sys = await buildSystemPrompt(this.cfg, {
       dailyLife: this.dailyLife,
@@ -493,7 +494,8 @@ export class Runtime extends EventEmitter {
       committedPrimary: this.primaryIsCommitted(),
       realism,
       tgUsername: this.tgSelf.username,
-      tgDisplayName: this.tgSelf.displayName
+      tgDisplayName: this.tgSelf.displayName,
+      fromId
     });
     const label = kind === "photo" ? "фото/селфи"
       : kind === "video" ? "видео"
@@ -610,6 +612,9 @@ export class Runtime extends EventEmitter {
         this.emit("event", { type: "ignored", text: m.text, chatId: m.chatId, reason: "privacy-owner-only" } as RuntimeEvent);
         return;
       }
+      // Load per-contact stage and scores
+      const contactRel = await readRelationship(this.cfg.slug, m.fromId);
+      this.cfg.stage = contactRel.stage as typeof this.cfg.stage;
       if (isPrimary && this.cfg.stage === "dumped") {
         this.emit("event", { type: "ignored", text: m.text, reason: "dumped" } as RuntimeEvent);
         return;
@@ -659,7 +664,7 @@ export class Runtime extends EventEmitter {
       // Фото нет в библиотеке (или другой тип медиа) — генерируем отказ
       let bubbles: string[] = [];
       try {
-        bubbles = await this.generateOutgoingMediaRefusal(requestedMedia, incomingText, scope);
+        bubbles = await this.generateOutgoingMediaRefusal(requestedMedia, incomingText, scope, m.fromId);
       } catch (e) {
         this.emit("event", { type: "error", text: silentErrorLabel(e) } as RuntimeEvent);
       }
@@ -670,7 +675,7 @@ export class Runtime extends EventEmitter {
     if (looksLikeJailbreak(m.text)) {
       let bubbles: string[] = [];
       try {
-        bubbles = await this.generateJailbreakReaction(incomingText, isPrimary ? "primary" : "acquaintance");
+        bubbles = await this.generateJailbreakReaction(incomingText, isPrimary ? "primary" : "acquaintance", m.fromId);
       } catch (e) {
         this.emit("event", { type: "error", text: silentErrorLabel(e) } as RuntimeEvent);
       }
@@ -745,7 +750,8 @@ export class Runtime extends EventEmitter {
       : false;
     const recentIncomingIds = (this.incomingMsgIds.get(key) ?? []).map(e => ({ messageId: e.messageId, text: e.text }));
     const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, {
-      presence, conflict, conflictColdActive: coldActive, blockHint, activeDialog, recentIncomingIds
+      presence, conflict, conflictColdActive: coldActive, blockHint, activeDialog, recentIncomingIds,
+      fromId: m.fromId
     });
     if (this.incomingSeq.get(key) !== seq) return;
     const baseDecision: DecisionSnapshot = {
@@ -769,9 +775,9 @@ export class Runtime extends EventEmitter {
 
     // apply mood delta immediately
     if (tick.moodDelta) {
-      const rel = await readRelationship(this.cfg.slug);
+      const rel = await readRelationship(this.cfg.slug, m.fromId);
       const newScore = applyMoodDelta(rel.score, tick.moodDelta);
-      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage });
+      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage }, m.fromId);
       this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
 
       // Эскалация / смягчение конфликта
@@ -792,8 +798,7 @@ export class Runtime extends EventEmitter {
       // авто-dumped если очень плохо
       if (newScore.annoyance > 80 && newScore.interest < -30 && (this.cfg.stage as string) !== "dumped") {
         this.cfg.stage = "dumped";
-        await writeConfig(this.cfg);
-        await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: "dumped" });
+        await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: "dumped" }, m.fromId);
         await maybeAdvanceRelationshipTimeline(this.cfg, rel.stage, "dumped");
         const agenda = await readAgenda(this.cfg.slug);
         const pending = agenda.filter(a => a.state === "pending");
@@ -825,7 +830,7 @@ export class Runtime extends EventEmitter {
     // Task #4: умная смена стадии (проверка раз в 5 сообщений).
     this.msgsSinceStageCheck++;
     if (shouldRunStageTransitionCheck(this.msgsSinceStageCheck)) {
-      this.checkStageTransition().catch(() => {});
+      this.checkStageTransition(m.fromId).catch(() => {});
     }
 
     if (!tick.shouldReply) {
@@ -877,7 +882,8 @@ export class Runtime extends EventEmitter {
       realism,
       media: incoming?.media,
       tgUsername: this.tgSelf.username,
-      tgDisplayName: this.tgSelf.displayName
+      tgDisplayName: this.tgSelf.displayName,
+      fromId: incoming?.fromId
     });
     const scopeHint = scope === "acquaintance"
       ? "\nЭто сторонний личный чат, не основной парень. Не используй память/отношения основного парня. Если заход романтический — поставь границу. Если вопрос обычный — ответь по легенде коротко."
@@ -938,7 +944,7 @@ export class Runtime extends EventEmitter {
 
     // reflect every 6 turns
     if (scope === "primary" && hist.length % 6 === 0) {
-      maybeReflect(this.llm, this.cfg, hist, conflict).catch(() => {});
+      maybeReflect(this.llm, this.cfg, hist, conflict, incoming?.fromId).catch(() => {});
     }
   }
 
@@ -1020,7 +1026,7 @@ export class Runtime extends EventEmitter {
   private async composeProactiveMessage(item: { about: string; reason: string; importance: 1 | 2 | 3; attempts: number }, hist: ConversationTurn[]): Promise<string> {
     const conflict = await readConflict(this.cfg.slug);
     const realism = await loadRealismContext(this.cfg, item.about);
-    const sys = await buildSystemPrompt(this.cfg, { dailyLife: this.dailyLife, conflict, realism, tgUsername: this.tgSelf.username, tgDisplayName: this.tgSelf.displayName });
+    const sys = await buildSystemPrompt(this.cfg, { dailyLife: this.dailyLife, conflict, realism, tgUsername: this.tgSelf.username, tgDisplayName: this.tgSelf.displayName, fromId: this.cfg.ownerId ?? undefined });
 
     // Собираем краткую выжимку из истории для подсказки
     const lastMessages = hist.slice(-10);
@@ -1056,7 +1062,7 @@ export class Runtime extends EventEmitter {
 
   // ===== commands =====
   async cmdStatus(): Promise<string> {
-    const rel = await readRelationship(this.cfg.slug);
+    const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
     const stage = findStage(this.cfg.stage);
     const communication = normalizeCommunicationProfile(this.cfg);
     return [
@@ -1110,7 +1116,7 @@ export class Runtime extends EventEmitter {
       stage: this.cfg.stage,
       score: { interest: 0, trust: 0, attraction: 0, annoyance: 0, cringe: 0 },
       notes: `stage: ${this.cfg.stage}\n<!--score:{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0}-->\n`
-    });
+    }, this.cfg.ownerId ?? undefined);
     // долгосрочную память чистим — она тебя как впервые видит
     await writeMd(this.cfg.slug, "memory/long-term.md", "");
     await clearConflict(this.cfg.slug);
@@ -1194,7 +1200,7 @@ export class Runtime extends EventEmitter {
   }
 
   async cmdDebug(chatId?: string): Promise<string> {
-    const rel = await readRelationship(this.cfg.slug);
+    const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
     const stage = findStage(this.cfg.stage);
     const conflict = await readConflict(this.cfg.slug);
     const communication = normalizeCommunicationProfile(this.cfg);
@@ -1231,7 +1237,7 @@ export class Runtime extends EventEmitter {
 
     const target = chatId ? this.resolveChatRef(chatId) : this.cfg.ownerId;
     const key = target !== undefined ? this.histKey(target) : this.histKey("default");
-    const rel = await readRelationship(this.cfg.slug);
+    const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
     const stage = findStage(this.cfg.stage);
     const conflict = await readConflict(this.cfg.slug);
     const { coldActive } = activeConflict(conflict);
@@ -1359,9 +1365,9 @@ export class Runtime extends EventEmitter {
     }
 
     // 4. Reset relationship scores
-    const rel = await readRelationship(this.cfg.slug);
+    const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
     const zeroScore = { interest: 0, trust: 0, attraction: 0, annoyance: 0, cringe: 0 };
-    await writeRelationship(this.cfg.slug, { ...rel, score: zeroScore });
+    await writeRelationship(this.cfg.slug, { ...rel, score: zeroScore }, this.cfg.ownerId ?? undefined);
 
     // 5. Clear conflict
     await clearConflict(this.cfg.slug);
@@ -1558,11 +1564,11 @@ export class Runtime extends EventEmitter {
     if (who === "her") s.herMsgs++; else s.hisMsgs++;
   }
 
-  private async checkStageTransition(): Promise<void> {
+  private async checkStageTransition(fromId: number): Promise<void> {
     if (this.paused) return;
     this.msgsSinceStageCheck = 0;
     try {
-      const rel = await readRelationship(this.cfg.slug);
+      const rel = await readRelationship(this.cfg.slug, fromId);
       const s = this.stageStats.get(this.cfg.stage);
       const decision = decideStageTransition({
         currentStage: this.cfg.stage,
@@ -1575,12 +1581,11 @@ export class Runtime extends EventEmitter {
       if (!decision) return;
       const oldStage = this.cfg.stage;
       this.cfg.stage = decision.next;
-      await writeConfig(this.cfg);
-      await writeRelationship(this.cfg.slug, { ...rel, stage: decision.next });
+      await writeRelationship(this.cfg.slug, { ...rel, stage: decision.next }, fromId);
       await maybeAdvanceRelationshipTimeline(this.cfg, oldStage, decision.next);
       this.stageStats.set(decision.next, { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() });
       this.emit("event", { type: "info", text: `stage ${oldStage} → ${decision.next} (${decision.reason})` } as RuntimeEvent);
-      await appendSessionLog(this.cfg.slug, this.cfg.tz, `[stage-transition] ${oldStage} → ${decision.next} (${decision.reason})`, this.cfg.ownerId);
+      await appendSessionLog(this.cfg.slug, this.cfg.tz, `[stage-transition] ${oldStage} → ${decision.next} (${decision.reason})`, fromId);
     } catch { /* swallow */ }
   }
 
@@ -1633,7 +1638,8 @@ export class Runtime extends EventEmitter {
       committedPrimary: this.primaryIsCommitted(),
       realism,
       tgUsername: this.tgSelf.username,
-      tgDisplayName: this.tgSelf.displayName
+      tgDisplayName: this.tgSelf.displayName,
+      fromId: m.fromId
     });
     const delaySec = 4 + Math.random() * 12;
     setTimeout(async () => {
@@ -1678,7 +1684,7 @@ export class Runtime extends EventEmitter {
       const lastHer = [...hist].reverse().find(t => t.role === "assistant");
       herLastMessageText = lastHer?.content;
     }
-    const rel = await readRelationship(this.cfg.slug);
+    const rel = await readRelationship(this.cfg.slug, m.fromId);
     const communication = normalizeCommunicationProfile(this.cfg);
     let decision = decideEmojiReactionResponse({
       emoji: m.emojiReaction.emoji,
@@ -1707,7 +1713,7 @@ export class Runtime extends EventEmitter {
     }
     if (decision.moodDelta && Object.keys(decision.moodDelta).length > 0) {
       const newScore = applyMoodDelta(rel.score, decision.moodDelta);
-      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage });
+      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage }, m.fromId);
       this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
     }
     if (decision.intent === "react-back" && decision.reactBackEmoji) {

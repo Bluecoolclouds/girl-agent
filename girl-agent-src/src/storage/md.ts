@@ -180,8 +180,13 @@ export interface StoredConversationTurn {
 
 const SCORE_RE = /<!--score:(.+?)-->/;
 
-export async function readRelationship(slug: string): Promise<RelationshipState> {
-  const raw = await readMd(slug, "relationship.md");
+function contactRelFile(fromId: number): string {
+  return `contacts/${fromId}/relationship.md`;
+}
+
+export async function readRelationship(slug: string, fromId?: number): Promise<RelationshipState> {
+  const file = fromId != null ? contactRelFile(fromId) : "relationship.md";
+  const raw = await readMd(slug, file);
   const m = raw.match(SCORE_RE);
   let score: RelationshipScore = { interest: 0, trust: 0, attraction: 0, annoyance: 0, cringe: 0 };
   if (m) {
@@ -195,7 +200,8 @@ export async function readRelationship(slug: string): Promise<RelationshipState>
   };
 }
 
-export async function writeRelationship(slug: string, state: RelationshipState): Promise<void> {
+export async function writeRelationship(slug: string, state: RelationshipState, fromId?: number): Promise<void> {
+  const file = fromId != null ? contactRelFile(fromId) : "relationship.md";
   let body = state.notes;
   if (SCORE_RE.test(body)) {
     body = body.replace(SCORE_RE, `<!--score:${JSON.stringify(state.score)}-->`);
@@ -204,7 +210,7 @@ export async function writeRelationship(slug: string, state: RelationshipState):
   }
   if (!/^stage:\s*/m.test(body)) body = `stage: ${state.stage}\n` + body;
   else body = body.replace(/^stage:\s*.+$/m, `stage: ${state.stage}`);
-  await writeMd(slug, "relationship.md", body);
+  await writeMd(slug, file, body);
 }
 
 /**

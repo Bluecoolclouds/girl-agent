@@ -29,7 +29,7 @@ export async function runHeadlessJsonEvents(rt: Runtime): Promise<void> {
 
   // Push initial relationship snapshot — у CLI-дашборда такая же логика на mount.
   try {
-    const r = await readRelationship(rt.cfg.slug);
+    const r = await readRelationship(rt.cfg.slug, rt.cfg.ownerId ?? undefined);
     out({ type: "score", score: r.score, t: Date.now() });
   } catch {
     /* первый запуск — отношений ещё нет */
@@ -60,12 +60,12 @@ export async function runHeadlessJsonEvents(rt: Runtime): Promise<void> {
         case "pause": rt.pause(); paused = true; text = "⏸ pause"; break;
         case "resume": rt.resume(); paused = false; text = "▶ resume"; break;
         case "cringe": {
-          const r = await readRelationship(rt.cfg.slug);
+          const r = await readRelationship(rt.cfg.slug, rt.cfg.ownerId ?? undefined);
           text = `cringe=${r.score.cringe}; см. memory/long-term.md и log/`;
           break;
         }
         case "relationship": {
-          const r = await readRelationship(rt.cfg.slug);
+          const r = await readRelationship(rt.cfg.slug, rt.cfg.ownerId ?? undefined);
           text = `stage=${r.stage} score=${JSON.stringify(r.score)}`;
           break;
         }
@@ -83,7 +83,7 @@ export async function runHeadlessJsonEvents(rt: Runtime): Promise<void> {
         }
         case "snapshot": {
           // Удобный для wrapper'а агрегированный snapshot — состояние, оценки, стадия.
-          const r = await readRelationship(rt.cfg.slug);
+          const r = await readRelationship(rt.cfg.slug, rt.cfg.ownerId ?? undefined);
           out({
             type: "snapshot",
             t: Date.now(),
