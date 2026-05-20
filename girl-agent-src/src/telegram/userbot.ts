@@ -161,13 +161,35 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
             fromName: undefined
           });
           trimIncomingCache();
+          // === replyTo: достаём текст цитируемого сообщения ===
+          let replyToText: string | undefined;
+          const replyToMsgId = m.replyTo?.replyToMsgId ?? m.replyTo?.className === "MessageReplyHeader" ? m.replyTo?.replyToMsgId : undefined;
+          if (replyToMsgId) {
+            try {
+              const msgs = await client.getMessages(isPrivate ? fromId : chatId, { ids: [replyToMsgId] });
+              const orig = msgs?.[0];
+              if (orig?.message) replyToText = String(orig.message).slice(0, 300);
+            } catch { /* некритично */ }
+          }
+
+          // === fwdFrom: имя источника пересылки ===
+          let forwardedFrom: string | undefined;
+          if (m.fwdFrom) {
+            const fwd = m.fwdFrom;
+            forwardedFrom = fwd.fromName
+              ?? fwd.postAuthor
+              ?? (fwd.fromId ? `id:${String((fwd.fromId as any).userId ?? (fwd.fromId as any).channelId ?? fwd.fromId)}` : undefined);
+          }
+
           await onMessage({
             text,
             fromId,
             chatId,
             messageId: Number(m.id),
             isPrivate,
-            media
+            media,
+            replyToText,
+            forwardedFrom
           });
         } catch {
           /* ignore per-message errors so the update loop survives */

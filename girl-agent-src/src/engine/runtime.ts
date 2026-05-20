@@ -315,9 +315,17 @@ export class Runtime extends EventEmitter {
   }
 
   private mediaAwareText(m: IncomingMessage): string {
+    const parts: string[] = [];
+    if (m.forwardedFrom) {
+      parts.push(`[переслано от: ${m.forwardedFrom}]`);
+    }
+    if (m.replyToText) {
+      parts.push(`[отвечает на: «${m.replyToText.slice(0, 120)}»]`);
+    }
     const media = describeIncomingMedia(m.media);
-    if (!media) return m.text;
-    return m.text ? `${media}\n${m.text}` : media;
+    if (media) parts.push(media);
+    if (m.text) parts.push(m.text);
+    return parts.join("\n") || m.text;
   }
 
   private async rememberSharedCrossChat(fromId: number, incomingText: string): Promise<void> {

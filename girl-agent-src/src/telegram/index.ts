@@ -32,6 +32,16 @@ export interface IncomingMessage {
     /** Как давно было исходное сообщение (в секундах на момент удаления). */
     ageSec: number;
   };
+  /**
+   * Если сообщение — ответ на старое (replyTo).
+   * Текст исходного сообщения чтобы ИИ понял контекст.
+   */
+  replyToText?: string;
+  /**
+   * Если сообщение — пересланное (fwdFrom).
+   * Имя/username источника пересылки.
+   */
+  forwardedFrom?: string;
 }
 
 export type IncomingMediaKind = "photo" | "video" | "voice" | "video_note" | "sticker" | "document";
