@@ -145,7 +145,7 @@ export function MediaPage() {
     setLoading(true);
     try {
       const r = await api.listPhotos(activeSlug);
-      setPhotos(r.photos);
+      setPhotos(Array.isArray(r?.photos) ? r.photos : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -222,7 +222,7 @@ export function MediaPage() {
 
       {loading ? (
         <div className="page-empty"><div className="spinner" /></div>
-      ) : photos.length === 0 ? (
+      ) : (photos ?? []).length === 0 ? (
         <div
           className="media-dropzone"
           onDragOver={e => e.preventDefault()}
