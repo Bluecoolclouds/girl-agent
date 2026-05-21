@@ -1081,13 +1081,20 @@ export class Runtime extends EventEmitter {
   }
 
   // ===== commands =====
+  /** Обновляет in-memory стадию без перезаписи всего конфига — вызывается из WebUI PATCH. */
+  setStage(stage: string): void {
+    this.cfg.stage = stage as typeof this.cfg.stage;
+  }
+
   async cmdStatus(): Promise<string> {
     const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
-    const stage = findStage(this.cfg.stage);
+    // rel.stage актуальнее — файл мог обновиться через WebUI PATCH
+    const effectiveStage = rel.stage || this.cfg.stage;
+    const stage = findStage(effectiveStage);
     const communication = normalizeCommunicationProfile(this.cfg);
     return [
       `имя: ${this.cfg.name}, ${this.cfg.age}`,
-      `стадия: ${stage.label} (${this.cfg.stage})`,
+      `стадия: ${stage.label} (${effectiveStage})`,
       `primary owner: ${this.cfg.ownerId ?? "—"}`,
       `privacy: ${this.cfg.privacy ?? "owner-only"}`,
       `llm: ${this.cfg.llm.presetId}/${this.cfg.llm.model || "—"} (${this.cfg.llm.proto})`,

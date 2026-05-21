@@ -248,6 +248,8 @@ export function registerProfileRoutes(r: Router): void {
     });
     if (transition) {
       rel.stage = transition.next;
+      // Обновляем in-memory стадию в живом runtime (если запущен)
+      bus.get(slug)?.setStage(transition.next);
     }
     await writeRelationship(slug, rel, targetId);
     const stageInfo = findStage(rel.stage);
