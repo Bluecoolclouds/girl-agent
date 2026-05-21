@@ -610,6 +610,10 @@ export class Runtime extends EventEmitter {
         return;
       }
       if (m.emojiReaction) {
+        const reactionLabel = m.emojiReaction.removed
+          ? `снял реакцию`
+          : `реакция ${m.emojiReaction.emoji}`;
+        this.emit("event", { type: "incoming", text: reactionLabel, chatId: m.chatId } as RuntimeEvent);
         await this.handleEmojiReaction(m).catch(e => this.emit("event", { type: "error", text: `handleEmojiReaction: ${silentErrorLabel(e)}` } as RuntimeEvent));
         return;
       }
