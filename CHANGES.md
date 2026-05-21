@@ -4,6 +4,116 @@
 
 ---
 
+## 9. Оптимизация токенов + фикс реакций + антигаллюцинация TG-действий
+
+### Суть изменений
+
+**Сокращение токенов на ~35–45% per message:**
+
+| Место | Было | Стало | Экономия |
+|-------|------|-------|----------|
+| `generateAndSend` история | `hist.slice(-60)` | `hist.slice(-20)` | -2 000–8 000 tok/сообщ. |
+| `behaviorTick` история | `recentHistory.slice(-8)` | `recentHistory.slice(-6)` | ~200 tok |
+| Реакционный блок в TEMPLATE | всегда | только при `recentIncomingIds.length > 0` | ~100 tok когда нет ID |
+| `emoji-reply` история | `hist.slice(-8)` | `hist.slice(-4)` | ~300 tok |
+| `emoji-reply` промпт | с `dailyLife` | без `dailyLife` | ~200 tok |
+| `deletion-reply` история | `hist.slice(-10)` | `hist.slice(-5)` | ~300 tok |
+
+Итого per message: ~2 300 tok → ~1 400–1 600 tok на `behaviorTick`, ~1 650 tok → ~1 100 tok на `generateAndSend`. Суммарно ~250 000 tok/день → ~140 000 tok/день при 50 сообщениях.
+
+**Фикс: реакции не ставились во время активного диалога.**
+
+Причина: в `behaviorTick` был early-return fast-path для `ctx.activeDialog` — он возвращал решение без LLM-вызова, и в объекте не было поля `reaction`. Так как активный диалог (она ответила < 5 мин назад) — самый частый сценарий, реакции не ставились практически никогда.
+
+Фикс: fast-path удалён. LLM вызывается всегда. После ответа LLM применяются ограничения активного диалога: `shouldReply=true`, `delaySec` зажат в 2–180с, правильный `bubbles`.
+
+**Фикс: LLM писала в тексте "ну я уже поставила реакцию" (галлюцинация TG-действий).**
+
+Причина: `generateAndSend` не запрещал LLM упоминать в тексте технические действия. При запросе "поставь реакцию на сообщение" LLM отвечала "ну я уже поставила)" — хотя реакция ставится движком отдельно через `setReaction`, не текстом.
+
+Фикс: добавлено явное правило в hint к `generateAndSend`.
+
+**Фикс: при явной просьбе поставить реакцию — `behaviorTick` теперь возвращает `reaction` поле.**
+
+Добавлено правило в TEMPLATE: если он прямо просит реакцию ("поставь реакцию", "лайкни", "сердечко поставь") — вернуть эмодзи в поле `reaction`.
+
+---
+
+### `girl-agent-src/src/engine/runtime.ts`
+
+**История в `generateAndSend`:**
+```diff
+- ...hist.slice(-60).map(t => ({ role: t.role, content: t.content }))
++ ...hist.slice(-20).map(t => ({ role: t.role, content: t.content }))
+```
+
+**Антигаллюцинация в hint к `generateAndSend`** (добавлено в конец строки с `# Подсказка от behavior-layer`):
+```diff
++ \nЗАПРЕЩЕНО писать в тексте что ты поставила реакцию, прочитала сообщение, удалила что-то или выполнила любое техническое действие в TG. Реакции и системные действия выполняет движок — не упоминай их в тексте вообще. Если он просит поставить реакцию — просто ответь коротко в своём стиле, не говори "поставила"/"уже поставила".
+```
+
+**`emoji-reply` — история и промпт:**
+```diff
+- const sys = await buildSystemPrompt(this.cfg, { dailyLife: this.dailyLife, ... });
++ const sys = await buildSystemPrompt(this.cfg, { /* dailyLife убран */ ... });
+
+- ...hist.slice(-8).map(...)
++ ...hist.slice(-4).map(...)
+```
+
+**`deletion-reply` — история:**
+```diff
+- ...hist.slice(-10).map(...)
++ ...hist.slice(-5).map(...)
+```
+
+---
+
+### `girl-agent-src/src/engine/behavior-tick.ts`
+
+**История в `behaviorTick`:**
+```diff
+- const history = recentHistory.slice(-8)
++ const history = recentHistory.slice(-6)
+```
+
+**Удалён fast-path активного диалога** (был до вызова LLM):
+```diff
+- if (ctx.activeDialog && !ctx.conflictColdActive) {
+-   const bubbles = sampleBubbles(communication, true);
+-   return { shouldReply: true, shouldRead: true, delaySec: ..., bubbles, typing: true, ... };
+- }
+```
+
+**Добавлен post-LLM override для активного диалога** (после парсинга JSON):
+```diff
++ if (ctx.activeDialog && !ctx.conflictColdActive) {
++   shouldReply = true;
++   if (intent === "ignore" || intent === "left-on-read") intent = "reply";
++   delaySec = clamp(delaySec, 2, 180);
++   bubbles = normalizeBubbles(bubbles, communication, intent, true);
++ }
+```
+
+**Реакционный блок в TEMPLATE стал условным** — показывается только когда `ctx.recentIncomingIds?.length > 0`:
+```diff
+- ${reactionsHint}
+- ${formatIncomingIds(ctx.recentIncomingIds)}
+- "reaction": "" или ОДИН эмодзи ...,
+- "reactionTargetMessageId": ID ...,
+- - Реакции — реальные девушки 2026 ...
+- - ВАЖНО: реакция должна соответствовать ...
++ ${ctx.recentIncomingIds?.length ? reactionsHint + "\n" + formatIncomingIds(...) : ""}
++ (reaction/reactionTargetMessageId поля и правила — только при наличии recentIncomingIds)
+```
+
+**Новое правило в TEMPLATE при `recentIncomingIds` непустом:**
+```diff
++ - Если он ЯВНО просит поставить реакцию ("поставь реакцию", "лайкни", "сердечко поставь") — верни подходящий эмодзи в поле "reaction". Не игнорируй явную просьбу.
+```
+
+---
+
 ## 5. Уведомления владельцу при прогреве контакта
 
 Когда контакт переходит на более тёплую стадию (direction = "up"), бот отправляет Telegram-сообщение на указанный `notifyOwnerId`. Если `notifyOwnerId` не задан — используется `ownerId`. Если оба пустые — уведомлений нет.
