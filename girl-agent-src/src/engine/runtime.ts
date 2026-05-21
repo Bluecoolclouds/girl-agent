@@ -1751,7 +1751,7 @@ export class Runtime extends EventEmitter {
       try {
         const raw = await this.llm.chat([
           { role: "system", content: `${sys}\n\n${buildDeletionPromptContext(this.cfg, ctx)}` },
-          ...hist.slice(-10).map(t => ({ role: t.role, content: t.content }))
+          ...hist.slice(-5).map(t => ({ role: t.role, content: t.content }))
         ], { temperature: 0.9, maxTokens: 600 });
         const reply = sanitizeModelReply(raw);
         if (!reply) return;
@@ -1851,7 +1851,6 @@ export class Runtime extends EventEmitter {
     if (decision.intent === "reply-text" && decision.llmContext) {
       const scope: RelationshipScope = "primary";
       const sys = await buildSystemPrompt(this.cfg, {
-        dailyLife: this.dailyLife,
         relationshipScope: scope,
         committedPrimary: this.primaryIsCommitted(),
         tgUsername: this.tgSelf.username,
@@ -1862,7 +1861,7 @@ export class Runtime extends EventEmitter {
         try {
           const raw = await this.llm.chat([
             { role: "system", content: `${sys}\n\n${decision.llmContext}` },
-            ...hist.slice(-8).map(t => ({ role: t.role, content: t.content }))
+            ...hist.slice(-4).map(t => ({ role: t.role, content: t.content }))
           ], { temperature: 0.9, maxTokens: 400 });
           const reply = sanitizeModelReply(raw);
           if (!reply) return;
