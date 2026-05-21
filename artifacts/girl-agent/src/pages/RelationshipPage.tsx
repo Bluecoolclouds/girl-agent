@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "../lib/store";
 import { api, statusSocket } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
@@ -20,6 +20,8 @@ export function RelationshipPage() {
   const toast = useStore(s => s.toast);
 
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const contactsRef = useRef<Contact[]>([]);
+  const selectedIdRef = useRef<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [contactSearch, setContactSearch] = useState("");
   const [contactLimit, setContactLimit] = useState(50);
@@ -34,10 +36,14 @@ export function RelationshipPage() {
   const loadContacts = (slug: string, keepSelected = false) => {
     void api.listContacts(slug)
       .then(r => {
+        contactsRef.current = r.contacts;
         setContacts(r.contacts);
         if (!keepSelected) {
           const primary = r.contacts.find(c => c.isPrimary) ?? r.contacts[0];
-          if (primary) setSelectedId(primary.fromId);
+          if (primary) {
+            selectedIdRef.current = primary.fromId;
+            setSelectedId(primary.fromId);
+          }
         }
       })
       .catch(() => {});
@@ -58,6 +64,7 @@ export function RelationshipPage() {
   // Загрузка данных при смене выбранного контакта
   useEffect(() => {
     if (!cfg) return;
+    selectedIdRef.current = selectedId;
     setStage(null);
     setScore(null);
     setNotes("");
@@ -72,6 +79,8 @@ export function RelationshipPage() {
   }, [cfg?.slug, selectedId]);
 
   // WebSocket — живые апдейты (для primary)
+  // Намеренно не включаем contacts/selectedId в deps — используем refs,
+  // чтобы не пересоздавать сокет и не сбрасывать историю при каждом обновлении списка.
   useEffect(() => {
     if (!cfg) return;
     setHistory([]);
@@ -79,16 +88,17 @@ export function RelationshipPage() {
       if (s.score) {
         setHistory(prev => [...prev.slice(-119), { t: s.t, values: { ...s.score } }]);
         // Обновляем score только если выбранный контакт — primary
-        const primaryContact = contacts.find(c => c.isPrimary);
-        if (!selectedId || selectedId === primaryContact?.fromId) {
+        const primaryContact = contactsRef.current.find(c => c.isPrimary);
+        if (!selectedIdRef.current || selectedIdRef.current === primaryContact?.fromId) {
           setScore(s.score);
         }
-        // Перезагружаем список контактов — мог появиться новый
+        // Перезагружаем список контактов — мог появиться новый (через ref, не меняет deps)
         loadContacts(cfg.slug, true);
       }
     });
     return () => off();
-  }, [cfg?.slug, contacts, selectedId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg?.slug]);
 
   const openEdit = () => {
     setEditVals({ ...(score ?? {}) });
