@@ -25,7 +25,7 @@ import { mineUnminedDailyLogs } from "./memory-palace.js";
 import { describeIncomingMedia, imagePartFromMedia, memeDetectionInstruction } from "./media.js";
 import { isQuotaExhaustedError, looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
 import { addStickerToLibrary, pickSticker } from "./stickers.js";
-import { pickPhoto, pickPhotoByTag, listPhotoTags } from "./photos.js";
+import { pickPhoto, pickPhotoByTag, listPhotoTags, markPhotoSent } from "./photos.js";
 import { EventEmitter } from "node:events";
 import { applyLLMUpdate, describeLLM } from "../config/llm-update.js";
 import { injectTypos, pickTypoIntensity } from "./typos.js";
@@ -653,13 +653,14 @@ export class Runtime extends EventEmitter {
       // Если просят фото и есть библиотека — шлём реальное фото
       if (requestedMedia === "photo" && this.tg.sendPhoto) {
         try {
-          const photo = await pickPhoto(this.cfg, incomingText);
+          const photo = await pickPhoto(this.cfg, incomingText, m.fromId ?? undefined);
           if (photo) {
             await this.tg.setTyping(m.chatId, true).catch(() => {});
             await sleep(800 + Math.random() * 1200);
             await this.tg.sendPhoto(m.chatId, photo.filePath, photo.caption);
             this.emit("event", { type: "info", text: `sent photo: ${photo.filePath}`, chatId: m.chatId } as RuntimeEvent);
             await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> sent photo ${photo.filePath}`, typeof m.chatId === "number" ? m.chatId : undefined);
+            if (m.fromId) await markPhotoSent(this.cfg, m.fromId, photo.filePath).catch(() => {});
             return;
           }
         } catch (e) {
@@ -1541,13 +1542,14 @@ export class Runtime extends EventEmitter {
         case "SEND_PHOTO":
           if (this.tg.sendPhoto) {
             try {
-              const photo = await pickPhotoByTag(this.cfg, arg ?? "");
+              const photo = await pickPhotoByTag(this.cfg, arg ?? "", chatId);
               if (photo) {
                 await this.tg.setTyping(chatId, true).catch(() => {});
                 await sleep(600 + Math.random() * 1000);
                 await this.tg.sendPhoto(chatId, photo.filePath, photo.caption);
                 this.emit("event", { type: "info", text: `AI tool: sent photo [${arg ?? "any"}] → ${photo.filePath}`, chatId } as RuntimeEvent);
                 await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> AI SEND_PHOTO [${arg ?? "any"}] ${photo.filePath}`, typeof chatId === "number" ? chatId : undefined).catch(() => {});
+                await markPhotoSent(this.cfg, chatId, photo.filePath).catch(() => {});
               } else {
                 this.emit("event", { type: "info", text: `AI tool: SEND_PHOTO — библиотека пуста, пропускаю`, chatId } as RuntimeEvent);
               }

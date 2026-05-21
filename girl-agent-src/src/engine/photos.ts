@@ -3,6 +3,32 @@ import path from "node:path";
 import type { ProfileConfig } from "../types.js";
 import { profileDir } from "../storage/md.js";
 
+// ─── Per-contact sent-photo tracking ────────────────────────────────────────
+
+function sentPhotosPath(cfg: ProfileConfig, fromId: number | string): string {
+  return path.join(profileDir(cfg.slug), "contacts", String(fromId), "sent_photos.txt");
+}
+
+export async function getSentPhotoFilenames(cfg: ProfileConfig, fromId: number | string): Promise<Set<string>> {
+  try {
+    const raw = await fs.readFile(sentPhotosPath(cfg, fromId), "utf8");
+    const names = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    return new Set(names);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function markPhotoSent(cfg: ProfileConfig, fromId: number | string, filePath: string): Promise<void> {
+  const p = sentPhotosPath(cfg, fromId);
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  await fs.appendFile(p, path.basename(filePath) + "\n", "utf8");
+}
+
+export async function resetSentPhotos(cfg: ProfileConfig, fromId: number | string): Promise<void> {
+  try { await fs.writeFile(sentPhotosPath(cfg, fromId), "", "utf8"); } catch { /* ignore */ }
+}
+
 export interface PhotoEntry {
   filePath: string;
   tags: string[];
@@ -60,22 +86,50 @@ export async function listPhotos(cfg: ProfileConfig): Promise<PhotoEntry[]> {
   return entries;
 }
 
-export async function pickPhoto(cfg: ProfileConfig, mood = ""): Promise<PhotoEntry | undefined> {
+/**
+ * Выбирает фото по настроению/ключевым словам.
+ * Если передан `fromId` — исключает уже отправленные этому контакту файлы.
+ * Если все подходящие фото уже отправлены — сбрасывает историю и начинает заново.
+ */
+export async function pickPhoto(cfg: ProfileConfig, mood = "", fromId?: number | string): Promise<PhotoEntry | undefined> {
   const photos = await listPhotos(cfg);
   if (!photos.length) return undefined;
   const q = mood.toLowerCase();
   const tagged = photos.filter(p => p.tags.some(t => q.includes(t.toLowerCase())));
   const pool = tagged.length ? tagged : photos;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return pickWithDedup(cfg, pool, fromId);
 }
 
-/** Выбирает фото по явному тегу. Если тег не совпал — берём любое из библиотеки. */
-export async function pickPhotoByTag(cfg: ProfileConfig, tag: string): Promise<PhotoEntry | undefined> {
+/**
+ * Выбирает фото по явному тегу.
+ * Если передан `fromId` — исключает уже отправленные этому контакту файлы.
+ * Если все фото с тегом уже отправлены — сбрасывает историю для этого тега и начинает заново.
+ */
+export async function pickPhotoByTag(cfg: ProfileConfig, tag: string, fromId?: number | string): Promise<PhotoEntry | undefined> {
   const photos = await listPhotos(cfg);
   if (!photos.length) return undefined;
   const t = tag.trim().toLowerCase();
   const matched = t ? photos.filter(p => p.tags.some(pt => pt.toLowerCase() === t)) : [];
   const pool = matched.length ? matched : photos;
+  return pickWithDedup(cfg, pool, fromId);
+}
+
+/**
+ * Выбирает случайное фото из пула, исключая уже отправленные контакту.
+ * Если все отправлены — сбрасывает историю и берёт из полного пула.
+ */
+async function pickWithDedup(cfg: ProfileConfig, pool: PhotoEntry[], fromId?: number | string): Promise<PhotoEntry | undefined> {
+  if (!pool.length) return undefined;
+  if (!fromId) return pool[Math.floor(Math.random() * pool.length)];
+
+  const sent = await getSentPhotoFilenames(cfg, fromId);
+  const unsent = pool.filter(p => !sent.has(path.basename(p.filePath)));
+
+  if (unsent.length > 0) {
+    return unsent[Math.floor(Math.random() * unsent.length)];
+  }
+  // Все фото в пуле уже отправлены — сбрасываем историю для этого контакта и берём заново
+  await resetSentPhotos(cfg, fromId);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
