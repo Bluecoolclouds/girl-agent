@@ -284,9 +284,12 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         } catch { /* keep update loop alive */ }
       }, new Raw({}));
     },
-    async sendText(chatId, text) {
+    async sendText(chatId, text, replyToMessageId) {
       const peer = await resolvePeer(chatId);
-      const msg = await client.sendMessage(peer, { message: text });
+      const msg = await client.sendMessage(peer, {
+        message: text,
+        ...(replyToMessageId ? { replyTo: replyToMessageId } : {}),
+      });
       return Number((msg as any).id);
     },
     async sendSticker(chatId, fileId) {

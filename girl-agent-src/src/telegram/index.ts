@@ -57,7 +57,7 @@ export interface IncomingMedia {
 
 export interface TgAdapter {
   start(onMessage: (m: IncomingMessage) => Promise<void>): Promise<void>;
-  sendText(chatId: number | string, text: string): Promise<number | undefined>;
+  sendText(chatId: number | string, text: string, replyToMessageId?: number): Promise<number | undefined>;
   setTyping(chatId: number | string, on: boolean): Promise<void>;
   /** Реакция на сообщение. Эмодзи 1 символ. Тихий no-op если не поддерживается. */
   setReaction(chatId: number | string, messageId: number, emoji: string): Promise<void>;

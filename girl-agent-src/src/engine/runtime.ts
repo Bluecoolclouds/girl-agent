@@ -345,7 +345,7 @@ export class Runtime extends EventEmitter {
     return undefined;
   }
 
-  private async sendBubbles(chatId: number | string, bubbles: string[], hist: ConversationTurn[], scope: RelationshipScope, typing = true): Promise<string[]> {
+  private async sendBubbles(chatId: number | string, bubbles: string[], hist: ConversationTurn[], scope: RelationshipScope, typing = true, replyToMessageId?: number): Promise<string[]> {
     const sent: string[] = [];
     if (this.userbotActionAvailable("readHistory")) {
       await this.tg.readHistory?.(chatId).catch(() => {});
@@ -378,7 +378,8 @@ export class Runtime extends EventEmitter {
         await sleep(typingMs + pauseMs);
       }
       if (typing) await this.tg.setTyping(chatId, true).catch(() => {});
-      const messageId = await this.tg.sendText(chatId, text);
+      const replyId = i === 0 ? replyToMessageId : undefined;
+      const messageId = await this.tg.sendText(chatId, text, replyId);
       const now = Date.now();
       this.lastRealSendMs = now;
       if (messageId) {
@@ -936,13 +937,14 @@ export class Runtime extends EventEmitter {
     }
 
     // Parse and execute tool markers at start of reply (userbot mode only)
-    const { cleanedReply, actions } = this.cfg.mode === "userbot" ? this.parseToolMarkers(reply) : { cleanedReply: reply, actions: [] as string[] };
+    const { cleanedReply, actions, replyTo } = this.cfg.mode === "userbot" ? this.parseToolMarkers(reply) : { cleanedReply: reply, actions: [] as string[], replyTo: false };
     for (const action of actions) {
       await this.executeToolAction(action, chatId);
     }
 
+    const replyToMessageId = replyTo && incoming?.messageId ? incoming.messageId : undefined;
     const bubbles = dedupeBubbles(smartSplitBubbles(cleanedReply, tick.bubbles || 1)).slice(0, Math.max(tick.bubbles || 1, 1));
-    const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing);
+    const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing, replyToMessageId);
     this.setDecisionStatus(this.histKey(chatId), sent.length ? "sent" : "fallback", sent.length ? undefined : "все пузыри были пустыми/дублями");
     if (scope === "primary") {
       recordInteractionMemory(this.llm, this.cfg, lastUser ?? "", sent.join(" / "), typeof chatId === "number" ? chatId : undefined, "primary").catch(() => {});
@@ -1454,8 +1456,8 @@ export class Runtime extends EventEmitter {
    *   НЕ попадёт юзеру как текст — вырезаем и логируем.
    * - известные маркеры (BLOCK/UNBLOCK/READ/STICKER) — исполняем.
    */
-  private parseToolMarkers(reply: string): { cleanedReply: string; actions: string[] } {
-    const KNOWN = new Set(["BLOCK", "UNBLOCK", "READ", "STICKER"]);
+  private parseToolMarkers(reply: string): { cleanedReply: string; actions: string[]; replyTo: boolean } {
+    const KNOWN = new Set(["BLOCK", "UNBLOCK", "READ", "STICKER", "REPLY_TO"]);
     const lines = reply.split("\n");
     const actions: string[] = [];
     let firstContentLine = 0;
@@ -1489,7 +1491,9 @@ export class Runtime extends EventEmitter {
     }
 
     const cleanedReply = lines.slice(firstContentLine).join("\n").trim();
-    return { cleanedReply, actions };
+    const replyTo = actions.includes("REPLY_TO");
+    const filteredActions = actions.filter(a => a !== "REPLY_TO");
+    return { cleanedReply, actions: filteredActions, replyTo };
   }
 
   private async executeToolAction(action: string, chatId: number | string): Promise<void> {

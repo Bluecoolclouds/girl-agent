@@ -75,14 +75,15 @@ export function makeBotAdapter(cfg: ProfileConfig): TgAdapter {
         process.stderr.write(`[bot] long-polling stopped: ${e?.message ?? e}\n`);
       });
     },
-    async sendText(chatId, text) {
+    async sendText(chatId, text, replyToMessageId) {
+      const replyParams = replyToMessageId ? { reply_parameters: { message_id: replyToMessageId } } : {};
       if (hasSpoilers(text)) {
         try {
-          const msg = await bot.api.sendMessage(chatId as number, toHtmlWithSpoilers(text), { parse_mode: "HTML" });
+          const msg = await bot.api.sendMessage(chatId as number, toHtmlWithSpoilers(text), { parse_mode: "HTML", ...replyParams });
           return msg.message_id;
         } catch { /* fall through to plain text */ }
       }
-      const msg = await bot.api.sendMessage(chatId as number, text);
+      const msg = await bot.api.sendMessage(chatId as number, text, replyParams as any);
       return msg.message_id;
     },
     async setTyping(chatId, on) {
