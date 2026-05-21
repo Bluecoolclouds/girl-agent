@@ -127,20 +127,6 @@ export async function behaviorTick(
   const history = recentHistory.slice(-6)
     .map(m => `${m.role === "user" ? "он" : "она"}: ${m.content}`).join("\n");
 
-  if (ctx.activeDialog && !ctx.conflictColdActive) {
-    const bubbles = sampleBubbles(communication, true);
-    return {
-      shouldReply: true,
-      shouldRead: true,
-      delaySec: clamp(activeDialogDelay(communication), 2, 180),
-      bubbles,
-      typing: true,
-      ignoreReason: undefined,
-      moodDelta: { interest: 1 },
-      intent: bubbles > 1 || communication.messageStyle !== "one-liners" ? "reply" : "short"
-    };
-  }
-
   // базовая защита: если cold-период активный — обходим LLM, сразу ignore с шансом 80%
   if (ctx.conflictColdActive && Math.random() < 0.8) {
     return {
@@ -243,6 +229,14 @@ export async function behaviorTick(
 
     delaySec = adjustDelay(delaySec, communication, ctx);
     bubbles = normalizeBubbles(bubbles, communication, intent, ctx.activeDialog);
+
+    // активный диалог: shouldReply=true всегда, delay не больше activeDialog-нормы
+    if (ctx.activeDialog && !ctx.conflictColdActive) {
+      shouldReply = true;
+      if (intent === "ignore" || intent === "left-on-read") intent = "reply";
+      delaySec = clamp(delaySec, 2, 180);
+      bubbles = normalizeBubbles(bubbles, communication, intent, true);
+    }
 
     return {
       shouldReply,
