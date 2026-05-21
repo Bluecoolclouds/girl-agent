@@ -268,6 +268,25 @@ export function ConfigurationPage() {
 
       <div className="card">
         <div className="card-header">
+          <div className="h-title">Медиатека из канала</div>
+        </div>
+        <div className="form-row">
+          <label>ID канала-источника фото</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="@username или -1001234567890"
+            value={(merged as any).photoChannelId ?? ""}
+            onChange={e => pf("photoChannelId" as any, e.target.value || undefined)}
+          />
+          <div className="hint">
+            Если задан — бот пересылает фото прямо из этого канала. В photos/index.md вместо имени файла пиши ID сообщения (число): <code>42 | selfie,cute | подпись</code>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
           <div className="h-title">Сон</div>
         </div>
         <div className="grid cols-2">

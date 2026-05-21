@@ -19,10 +19,16 @@ export async function getSentPhotoFilenames(cfg: ProfileConfig, fromId: number |
   }
 }
 
-export async function markPhotoSent(cfg: ProfileConfig, fromId: number | string, filePath: string): Promise<void> {
+/** Стабильный ключ для дедупликации: имя файла или ch:MSGID для канальных записей. */
+export function photoEntryKey(photo: PhotoEntry): string {
+  if (photo.channelMsgId !== undefined) return `ch:${photo.channelMsgId}`;
+  return path.basename(photo.filePath);
+}
+
+export async function markPhotoSent(cfg: ProfileConfig, fromId: number | string, photo: PhotoEntry): Promise<void> {
   const p = sentPhotosPath(cfg, fromId);
   await fs.mkdir(path.dirname(p), { recursive: true });
-  await fs.appendFile(p, path.basename(filePath) + "\n", "utf8");
+  await fs.appendFile(p, photoEntryKey(photo) + "\n", "utf8");
 }
 
 export async function resetSentPhotos(cfg: ProfileConfig, fromId: number | string): Promise<void> {
@@ -30,7 +36,10 @@ export async function resetSentPhotos(cfg: ProfileConfig, fromId: number | strin
 }
 
 export interface PhotoEntry {
+  /** Путь к локальному файлу. Пустая строка если запись канальная (channelMsgId). */
   filePath: string;
+  /** ID сообщения в канале cfg.photoChannelId (если запись канальная). */
+  channelMsgId?: number;
   tags: string[];
   caption?: string;
 }
@@ -39,10 +48,17 @@ const PHOTOS_DIR = "photos";
 const INDEX_FILE = "photos/index.md";
 
 const DEFAULT_INDEX = `# photo library
-# Формат: filename.jpg | tag1,tag2,tag3 | необязательная подпись
+# Формат 1 — локальный файл:
+#   filename.jpg | tag1,tag2,tag3 | необязательная подпись
+#
+# Формат 2 — пересылка из канала (нужен photoChannelId в конфиге):
+#   123 | tag1,tag2,tag3 | текст под фото в канале
+#   (число = ID сообщения в канале-источнике)
+#
 # Примеры тегов: selfie, face, gym, home, outfit, casual, cute, flirt
-# Пример:
+# Примеры:
 # selfie1.jpg | selfie,face,cute | привет)
+# 42 | lingerie,hot | новое фото 🔥
 `;
 
 async function photosDir(cfg: ProfileConfig): Promise<string> {
@@ -69,9 +85,23 @@ export async function listPhotos(cfg: ProfileConfig): Promise<PhotoEntry[]> {
   for (const line of raw.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-    const [filename = "", tagsRaw = "", caption] = trimmed.split("|").map(x => x.trim());
-    if (!filename) continue;
-    const filePath = path.join(dir, filename);
+    const [source = "", tagsRaw = "", caption] = trimmed.split("|").map(x => x.trim());
+    if (!source) continue;
+
+    // Канальная запись: чистое целое число = ID сообщения
+    const msgId = /^\d+$/.test(source) ? parseInt(source, 10) : NaN;
+    if (!isNaN(msgId)) {
+      entries.push({
+        filePath: "",
+        channelMsgId: msgId,
+        tags: tagsRaw ? tagsRaw.split(",").map(x => x.trim()).filter(Boolean) : [],
+        caption: caption || undefined,
+      });
+      continue;
+    }
+
+    // Локальный файл
+    const filePath = path.join(dir, source);
     try {
       await fs.access(filePath);
     } catch {
@@ -123,7 +153,7 @@ async function pickWithDedup(cfg: ProfileConfig, pool: PhotoEntry[], fromId?: nu
   if (!fromId) return pool[Math.floor(Math.random() * pool.length)];
 
   const sent = await getSentPhotoFilenames(cfg, fromId);
-  const unsent = pool.filter(p => !sent.has(path.basename(p.filePath)));
+  const unsent = pool.filter(p => !sent.has(photoEntryKey(p)));
 
   if (unsent.length > 0) {
     return unsent[Math.floor(Math.random() * unsent.length)];

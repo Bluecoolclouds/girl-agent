@@ -126,6 +126,9 @@ export function makeBotAdapter(cfg: ProfileConfig): TgAdapter {
       const { InputFile } = await import("grammy");
       await bot.api.sendPhoto(chatId as number, new InputFile(filePath), caption ? { caption } : undefined);
     },
+    async forwardMessage(fromChatId, msgId, toChatId) {
+      await bot.api.forwardMessage(toChatId as number, fromChatId as number, msgId);
+    },
     getSelf() {
       return selfInfo;
     },

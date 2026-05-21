@@ -364,6 +364,16 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       const peer = await resolvePeer(chatId);
       await client.sendFile(peer, { file: filePath, caption: caption ?? "" });
     },
+    async forwardMessage(fromChatId, msgId, toChatId) {
+      const fromPeer = await resolvePeer(fromChatId);
+      const toPeer = await resolvePeer(toChatId);
+      await client.invoke(new Api.messages.ForwardMessages({
+        fromPeer,
+        id: [msgId],
+        toPeer,
+        randomId: [bigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))],
+      }));
+    },
     async setTyping(chatId, on) {
       if (!on) return;
       try {

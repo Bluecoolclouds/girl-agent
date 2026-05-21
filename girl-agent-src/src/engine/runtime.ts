@@ -1631,22 +1631,34 @@ export class Runtime extends EventEmitter {
           }
           break;
         case "SEND_PHOTO":
-          if (this.tg.sendPhoto) {
-            try {
-              const photo = await pickPhotoByTag(this.cfg, arg ?? "", chatId);
-              if (photo) {
-                await this.tg.setTyping(chatId, true).catch(() => {});
-                await sleep(600 + Math.random() * 1000);
+          try {
+            const photo = await pickPhotoByTag(this.cfg, arg ?? "", chatId);
+            if (photo) {
+              await this.tg.setTyping(chatId, true).catch(() => {});
+              await sleep(600 + Math.random() * 1000);
+              if (photo.channelMsgId !== undefined && this.cfg.photoChannelId) {
+                // Пересылка из канала-источника
+                if (this.tg.forwardMessage) {
+                  await this.tg.forwardMessage(this.cfg.photoChannelId, photo.channelMsgId, chatId);
+                  this.emit("event", { type: "info", text: `AI tool: forwarded photo [${arg ?? "any"}] from ${this.cfg.photoChannelId} msg#${photo.channelMsgId}`, chatId } as RuntimeEvent);
+                  await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> AI SEND_PHOTO (fwd) [${arg ?? "any"}] ch:${photo.channelMsgId}`, typeof chatId === "number" ? chatId : undefined).catch(() => {});
+                } else {
+                  this.emit("event", { type: "error", text: `SEND_PHOTO: forwardMessage не поддерживается адаптером`, chatId } as RuntimeEvent);
+                }
+              } else if (photo.filePath && this.tg.sendPhoto) {
+                // Локальный файл
                 await this.tg.sendPhoto(chatId, photo.filePath, photo.caption);
                 this.emit("event", { type: "info", text: `AI tool: sent photo [${arg ?? "any"}] → ${photo.filePath}`, chatId } as RuntimeEvent);
                 await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> AI SEND_PHOTO [${arg ?? "any"}] ${photo.filePath}`, typeof chatId === "number" ? chatId : undefined).catch(() => {});
-                await markPhotoSent(this.cfg, chatId, photo.filePath).catch(() => {});
               } else {
-                this.emit("event", { type: "info", text: `AI tool: SEND_PHOTO — библиотека пуста, пропускаю`, chatId } as RuntimeEvent);
+                this.emit("event", { type: "info", text: `AI tool: SEND_PHOTO — нет адаптера или не задан photoChannelId`, chatId } as RuntimeEvent);
               }
-            } catch (e) {
-              this.emit("event", { type: "error", text: `SEND_PHOTO failed: ${silentErrorLabel(e)}`, chatId } as RuntimeEvent);
+              await markPhotoSent(this.cfg, chatId, photo).catch(() => {});
+            } else {
+              this.emit("event", { type: "info", text: `AI tool: SEND_PHOTO — библиотека пуста, пропускаю`, chatId } as RuntimeEvent);
             }
+          } catch (e) {
+            this.emit("event", { type: "error", text: `SEND_PHOTO failed: ${silentErrorLabel(e)}`, chatId } as RuntimeEvent);
           }
           break;
         default:

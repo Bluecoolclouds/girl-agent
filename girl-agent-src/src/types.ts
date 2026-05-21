@@ -151,6 +151,8 @@ export interface ProfileConfig {
   communication?: CommunicationProfile;
   personaNotes?: string;
   busySchedule?: BusySlot[];
+  /** ID или @username канала-источника фото. Из него бот пересылает по message_id. */
+  photoChannelId?: string;
 }
 
 export interface RelationshipScore {
