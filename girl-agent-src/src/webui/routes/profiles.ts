@@ -1,7 +1,7 @@
 import { Router, HttpError } from "../http.js";
 import {
   DATA_ROOT, listProfiles, readConfig, writeConfig, deleteProfile, ensureProfile,
-  readMd, writeMd, slugify, normalizeOwnerId, profileDir, readRelationship, sessionDate,
+  readMd, writeMd, slugify, normalizeOwnerId, profileDir, readRelationship, writeRelationship, sessionDate,
   readSessionLog, listSessionDays, listDailySummaries, readDailySummary
 } from "../../storage/md.js";
 import type { ProfileConfig } from "../../types.js";
@@ -198,6 +198,23 @@ export function registerProfileRoutes(r: Router): void {
     const rel = await readRelationship(slug, cfg.ownerId ?? undefined);
     const stage = findStage(rel.stage);
     return { stage: { id: stage.id, num: stage.num, label: stage.label }, score: rel.score };
+  });
+
+  r.patch("/api/profiles/:slug/relationship", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const { fromId, score: delta } = body as { fromId?: number; score: Record<string, number> };
+    const targetId = fromId ?? cfg.ownerId ?? undefined;
+    const rel = await readRelationship(slug, targetId);
+    const KEYS = ["interest", "trust", "attraction", "annoyance", "cringe"] as const;
+    for (const k of KEYS) {
+      if (typeof delta[k] === "number") {
+        rel.score[k] = Math.max(0, Math.min(100, delta[k]));
+      }
+    }
+    await writeRelationship(slug, rel, targetId);
+    return { ok: true, score: rel.score };
   });
 
   // Memory files

@@ -21,10 +21,14 @@ export function RelationshipPage() {
   const [score, setScore] = useState<Record<string, number> | null>(null);
   const [history, setHistory] = useState<ScorePoint[]>([]);
   const [notes, setNotes] = useState<string>("");
+  const [editing, setEditing] = useState(false);
+  const [editVals, setEditVals] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!cfg) return;
     setHistory([]);
+    setEditing(false);
     void api.getRelationship(cfg.slug)
       .then(r => { setStage(r.stage); setScore(r.score); })
       .catch(() => { /* silent */ });
@@ -39,6 +43,38 @@ export function RelationshipPage() {
     });
     return () => off();
   }, [cfg?.slug]);
+
+  const openEdit = () => {
+    setEditVals({ ...(score ?? {}) });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!cfg || !score) return;
+    setSaving(true);
+    try {
+      const r = await api.patchRelationship(cfg.slug, editVals);
+      setScore(r.score);
+      setEditing(false);
+      toast("Очки сохранены", "success");
+    } catch (e) {
+      toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const bump = async (key: string, delta: number) => {
+    if (!cfg || !score) return;
+    const next = Math.max(0, Math.min(100, (score[key] ?? 0) + delta));
+    const patch = { [key]: next };
+    try {
+      const r = await api.patchRelationship(cfg.slug, patch);
+      setScore(r.score);
+    } catch (e) {
+      toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    }
+  };
 
   if (!cfg) {
     return <div className="empty"><div className="em-icon">♥</div><div className="em-title">Профиль не выбран</div><button className="btn primary" onClick={() => showSetupFlow(true)}>Создать</button></div>;
@@ -63,14 +99,48 @@ export function RelationshipPage() {
       <div className="card">
         <div className="card-header">
           <div className="h-title">Текущие шкалы</div>
+          <div className="h-actions">
+            {!editing && score && (
+              <button className="btn tiny" onClick={openEdit}>✏ Изменить</button>
+            )}
+            {editing && (
+              <>
+                <button className="btn tiny primary" onClick={saveEdit} disabled={saving}>{saving ? "…" : "Сохранить"}</button>
+                <button className="btn tiny" onClick={() => setEditing(false)}>Отмена</button>
+              </>
+            )}
+          </div>
         </div>
-        {score && (
+        {score && !editing && (
           <div className="score-grid">
             {SCORES.map(s => (
               <div key={s.key} className={`score-cell ${s.negative ? "negative" : ""}`}>
                 <div className="lbl">{s.label}</div>
-                <div className="val">{Math.round(score[s.key] ?? 0)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button className="btn tiny" style={{ padding: "0 6px", minWidth: 24 }} onClick={() => bump(s.key, -10)}>−</button>
+                  <div className="val" style={{ minWidth: 32, textAlign: "center" }}>{Math.round(score[s.key] ?? 0)}</div>
+                  <button className="btn tiny" style={{ padding: "0 6px", minWidth: 24 }} onClick={() => bump(s.key, +10)}>+</button>
+                </div>
                 <div className="bar"><div className="fill" style={{ width: `${Math.min(100, Math.max(0, score[s.key] ?? 0))}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        )}
+        {score && editing && (
+          <div className="score-grid">
+            {SCORES.map(s => (
+              <div key={s.key} className={`score-cell ${s.negative ? "negative" : ""}`}>
+                <div className="lbl">{s.label}</div>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  style={{ width: 72, fontFamily: "var(--ga-font-mono)" }}
+                  value={editVals[s.key] ?? 0}
+                  onChange={e => setEditVals(v => ({ ...v, [s.key]: Number(e.target.value) }))}
+                />
+                <div className="bar"><div className="fill" style={{ width: `${Math.min(100, Math.max(0, editVals[s.key] ?? 0))}%` }} /></div>
               </div>
             ))}
           </div>

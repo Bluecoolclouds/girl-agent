@@ -260,15 +260,49 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
             : Number(peer?.channelId?.value ?? peer?.chatId?.value ?? 0);
           if (!chatId) return;
           const messageId = Number(update.msgId);
+          const myId = Number((me?.id as any)?.value ?? me?.id ?? 0);
           const reactions = (update.reactions?.recentReactions ?? []) as any[];
           // Берём последнюю реакцию от партнёра (не от самой девушки).
-          const lastFromOther = reactions
-            .filter((r: any) => Number(r.peerId?.userId?.value ?? r.peerId?.userId ?? 0) !== Number((me?.id as any)?.value ?? me?.id ?? 0))
+          let lastFromOther = reactions
+            .filter((r: any) => Number(r.peerId?.userId?.value ?? r.peerId?.userId ?? 0) !== myId)
             .pop();
+
+          // Fallback: если recentReactions пустой (Telegram иногда не присылает его),
+          // но есть results с ненулевыми счётчиками — в приватном чате fromId === chatId.
+          if (!lastFromOther && isPrivate) {
+            const results = (update.reactions?.results ?? []) as any[];
+            const firstResult = results.find((r: any) => Number(r.count ?? 0) > 0);
+            if (firstResult) {
+              const emoji = firstResult.reaction?.emoticon as string | undefined;
+              if (emoji) {
+                await onMessage({
+                  text: "",
+                  fromId: chatId,
+                  chatId,
+                  messageId,
+                  isPrivate,
+                  emojiReaction: { emoji, targetMessageId: messageId, removed: false }
+                }).catch(() => {});
+              }
+              return;
+            }
+            // results пустой → все реакции сняты
+            await onMessage({
+              text: "",
+              fromId: chatId,
+              chatId,
+              messageId,
+              isPrivate,
+              emojiReaction: { emoji: "", targetMessageId: messageId, removed: true }
+            }).catch(() => {});
+            return;
+          }
+
           if (!lastFromOther) return;
           const emoji = lastFromOther.reaction?.emoticon as string | undefined;
-          if (!emoji) return;
+          const removed = !emoji;
           const fromId = Number(lastFromOther.peerId?.userId?.value ?? lastFromOther.peerId?.userId ?? 0);
+          if (!emoji && !removed) return;
           await onMessage({
             text: "",
             fromId,
@@ -276,9 +310,9 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
             messageId,
             isPrivate,
             emojiReaction: {
-              emoji,
+              emoji: emoji ?? "",
               targetMessageId: messageId,
-              removed: false
+              removed
             }
           }).catch(() => {});
         } catch { /* keep update loop alive */ }
