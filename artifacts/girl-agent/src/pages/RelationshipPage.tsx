@@ -21,6 +21,8 @@ export function RelationshipPage() {
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactLimit, setContactLimit] = useState(50);
   const [stage, setStage] = useState<{ id: string; num: number; label: string } | null>(null);
   const [score, setScore] = useState<Record<string, number> | null>(null);
   const [history, setHistory] = useState<ScorePoint[]>([]);
@@ -129,6 +131,12 @@ export function RelationshipPage() {
 
   const selectedContact = contacts.find(c => c.fromId === selectedId);
 
+  const filteredContacts = contactSearch.trim()
+    ? contacts.filter(c => String(c.fromId).includes(contactSearch.trim()))
+    : contacts;
+  const visibleContacts = filteredContacts.slice(0, contactLimit);
+  const hiddenCount = filteredContacts.length - visibleContacts.length;
+
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 920 }}>
 
@@ -138,9 +146,19 @@ export function RelationshipPage() {
           <div className="card-header">
             <div className="h-title">Контакт</div>
             <div className="h-meta">{contacts.length} чат{contacts.length > 1 ? "а" : ""}</div>
+            <div className="h-actions">
+              <input
+                className="input"
+                type="text"
+                placeholder="поиск по ID…"
+                value={contactSearch}
+                onChange={e => { setContactSearch(e.target.value); setContactLimit(50); }}
+                style={{ width: 140, fontFamily: "var(--ga-font-mono)", fontSize: 13, padding: "3px 8px" }}
+              />
+            </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "4px 0" }}>
-            {contacts.map(c => (
+            {visibleContacts.map(c => (
               <button
                 key={c.fromId}
                 className={`btn tiny${selectedId === c.fromId ? " primary" : ""}`}
@@ -151,7 +169,19 @@ export function RelationshipPage() {
                 <span style={{ marginLeft: 6, opacity: 0.6, fontSize: 11 }}>{c.stage}</span>
               </button>
             ))}
+            {hiddenCount > 0 && (
+              <button
+                className="btn tiny"
+                onClick={() => setContactLimit(l => l + 50)}
+                style={{ opacity: 0.7 }}
+              >
+                +{hiddenCount} ещё
+              </button>
+            )}
           </div>
+          {filteredContacts.length === 0 && contactSearch && (
+            <div className="hint" style={{ marginTop: 8 }}>Нет контактов с ID «{contactSearch}».</div>
+          )}
         </div>
       )}
 
