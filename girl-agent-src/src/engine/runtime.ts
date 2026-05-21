@@ -841,6 +841,28 @@ export class Runtime extends EventEmitter {
       }, reactDelay).unref?.();
     }
 
+    // fallback-реакция когда она отвечает но LLM не вернул reaction
+    if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot") {
+      const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
+        ? ["❤", 0.35] as const
+        : this.cfg.stage === "dating-early"
+        ? ["❤", 0.3] as const
+        : ["warming", "tg-given"].includes(this.cfg.stage)
+        ? ["❤", 0.25] as const
+        : this.cfg.stage === "tg-given-cold"
+        ? ["👍", 0.2] as const
+        : ["👍", 0.1] as const;
+      if (Math.random() < fbChance) {
+        const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId);
+        const fbDelay = (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
+        setTimeout(async () => {
+          await this.tg.setReaction(m.chatId, target.messageId, fbEmoji).catch(() => {});
+          this.emit("event", { type: "info", text: `${fbEmoji} (reply-react fallback)` } as RuntimeEvent);
+          appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ${fbEmoji} reply-react-fallback`, m.fromId).catch(() => {});
+        }, fbDelay).unref?.();
+      }
+    }
+
     // Task #4: умная смена стадии (проверка раз в 5 сообщений).
     this.msgsSinceStageCheck++;
     if (shouldRunStageTransitionCheck(this.msgsSinceStageCheck)) {
@@ -852,19 +874,24 @@ export class Runtime extends EventEmitter {
       if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
         await this.tg.readHistory?.(m.chatId).catch(() => {});
       }
-      // ❤ при прочтении без ответа — на тёплых стадиях (если behaviorTick не вернул реакцию)
+      // реакция при прочтении без ответа (если behaviorTick не вернул реакцию)
       if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
-        const heartChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
-          : this.cfg.stage === "dating-early" ? 0.5
-          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.5
-          : 0;
-        if (heartChance > 0 && Math.random() < heartChance) {
+        const [readEmoji, readChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
+          ? ["❤", 0.5] as const
+          : this.cfg.stage === "dating-early"
+          ? ["❤", 0.5] as const
+          : ["warming", "tg-given"].includes(this.cfg.stage)
+          ? ["❤", 0.5] as const
+          : this.cfg.stage === "tg-given-cold"
+          ? ["👍", 0.15] as const
+          : ["👍", 0.05] as const;
+        if (Math.random() < readChance) {
           const target = this.pickReactionTarget(key, m.messageId);
           const delay = 3_000 + Math.random() * 8_000;
           setTimeout(async () => {
-            await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
-            this.emit("event", { type: "info", text: `❤ (read-react, без ответа)` } as RuntimeEvent);
-            appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ read-react`, m.fromId).catch(() => {});
+            await this.tg.setReaction(m.chatId, target.messageId, readEmoji).catch(() => {});
+            this.emit("event", { type: "info", text: `${readEmoji} (read-react, без ответа)` } as RuntimeEvent);
+            appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ${readEmoji} read-react`, m.fromId).catch(() => {});
           }, delay).unref?.();
         }
       }
