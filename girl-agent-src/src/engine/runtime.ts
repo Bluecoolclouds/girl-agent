@@ -700,7 +700,14 @@ export class Runtime extends EventEmitter {
       // Создаём/обновляем файл контакта чтобы он появился в WebUI
       await writeRelationship(this.cfg.slug, contactRel, m.fromId);
       this.emit("event", { type: "score", score: contactRel.score } as RuntimeEvent);
-      const tick = this.acquaintanceTick(romanticApproach);
+      const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, { fromId: m.fromId });
+      // Применяем moodDelta — обновляем скоры контакта
+      if (tick.moodDelta && Object.keys(tick.moodDelta).length > 0) {
+        const updatedRel = await readRelationship(this.cfg.slug, m.fromId);
+        const newScore = applyMoodDelta(updatedRel.score, tick.moodDelta);
+        await writeRelationship(this.cfg.slug, { ...updatedRel, score: newScore, stage: this.cfg.stage }, m.fromId);
+        this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
+      }
       // Реакция для acquaintance — ставим в то же окно что и ответ (readHistory уже в sendBubbles)
       if (this.cfg.mode === "userbot") {
         const reactChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
