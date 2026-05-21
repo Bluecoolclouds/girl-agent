@@ -851,9 +851,9 @@ export class Runtime extends EventEmitter {
       }
       // ❤ при прочтении без ответа — на тёплых стадиях (если behaviorTick не вернул реакцию)
       if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
-        const heartChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.35
-          : this.cfg.stage === "dating-early" ? 0.25
-          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.12
+        const heartChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
+          : this.cfg.stage === "dating-early" ? 0.5
+          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.5
           : 0;
         if (heartChance > 0 && Math.random() < heartChance) {
           const target = this.pickReactionTarget(key, m.messageId);
