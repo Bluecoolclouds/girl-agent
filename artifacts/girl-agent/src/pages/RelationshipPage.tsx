@@ -201,7 +201,7 @@ export function RelationshipPage() {
           </div>
           <div className="h-actions">
             <button className="btn tiny" onClick={() => sendCmd("status", toast, cfg.slug)}>:status</button>
-            <button className="btn tiny" onClick={() => sendCmd("why", toast, cfg.slug)}>:why</button>
+            <button className="btn tiny" onClick={() => sendCmd("why", toast, cfg.slug, selectedId ? [String(selectedId)] : [])}>:why</button>
             <button className="btn tiny danger" onClick={() => { if (confirm("Сбросить relationship?")) sendCmd("reset", toast, cfg.slug); }}>:reset</button>
           </div>
         </div>
@@ -321,9 +321,9 @@ function Sparklines({ data }: { data: ScorePoint[] }) {
   );
 }
 
-async function sendCmd(cmd: string, toast: (t: string, k?: "success" | "error" | "info") => void, slug: string) {
+async function sendCmd(cmd: string, toast: (t: string, k?: "success" | "error" | "info") => void, slug: string, args: string[] = []) {
   try {
-    const r = await api.sendCommand(slug, cmd);
+    const r = await api.sendCommand(slug, cmd, args);
     toast(r.text || `${cmd} ok`, "success");
   } catch (e) {
     toast(`${cmd}: ${(e as Error)?.message}`, "error");

@@ -1261,8 +1261,9 @@ export class Runtime extends EventEmitter {
 
     const target = chatId ? this.resolveChatRef(chatId) : this.cfg.ownerId;
     const key = target !== undefined ? this.histKey(target) : this.histKey("default");
-    const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
-    const stage = findStage(this.cfg.stage);
+    const targetFromId = target !== undefined ? Number(target) : this.cfg.ownerId;
+    const rel = await readRelationship(this.cfg.slug, targetFromId ?? undefined);
+    const stage = findStage(rel.stage as typeof this.cfg.stage);
     const conflict = await readConflict(this.cfg.slug);
     const { coldActive } = activeConflict(conflict);
     const forcedWake = Date.now() < this.forcedWakeUntil && (!this.forcedWakeChatId || this.forcedWakeChatId === key);
