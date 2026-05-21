@@ -132,12 +132,13 @@ export class Runtime extends EventEmitter {
 
     // Сканируем канал и обновляем photos/index.md (в фоне)
     if (this.cfg.photoChannelId && this.cfg.mode === "userbot") {
+      process.stderr.write(`[channel-scan] старт скана канала ${this.cfg.photoChannelId}\n`);
       scanChannelPhotos(this.cfg, this.tg).then(({ added, skipped }) => {
-        if (added > 0) {
-          this.emit("event", { type: "info", text: `channel-scan: добавлено ${added} фото/видео в index.md (пропущено дублей: ${skipped})` } as RuntimeEvent);
-        }
+        process.stderr.write(`[channel-scan] готово: добавлено=${added} пропущено=${skipped}\n`);
+        this.emit("event", { type: "info", text: `channel-scan: добавлено ${added} фото/видео в index.md (пропущено дублей: ${skipped})` } as RuntimeEvent);
       }).catch((e: unknown) => {
         const msg = (e instanceof Error) ? e.message : String(e);
+        process.stderr.write(`[channel-scan] ОШИБКА: ${msg}\n`);
         this.emit("event", { type: "info", text: `channel-scan: не удалось — ${msg.slice(0, 120)}` } as RuntimeEvent);
       });
     }

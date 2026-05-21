@@ -445,15 +445,23 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       };
     },
     async *iterChannelMedia(channelId: string, limit: number) {
-      // Ищем канал перебором диалогов (нужна access hash из кэша)
-      const targetId = Math.abs(Number(String(channelId).replace(/^-100/, "")));
-      let foundEntity: any = null;
-      for await (const dialog of client.iterDialogs({ limit: 500 })) {
-        const id = Number((dialog.entity as any)?.id ?? 0);
-        if (id === targetId) { foundEntity = dialog.entity; break; }
+      // Резолвим канал напрямую через getEntity (работает если аккаунт состоит в канале)
+      const numId = Number(channelId); // отрицательное число типа -1003972740948
+      let entity: any;
+      try {
+        entity = await client.getEntity(BigInt(numId));
+      } catch (e1) {
+        // Fallback: перебираем диалоги
+        const targetId = Math.abs(Number(String(channelId).replace(/^-100/, "")));
+        let found: any = null;
+        for await (const dialog of client.iterDialogs({ limit: 500 })) {
+          const id = Number((dialog.entity as any)?.id ?? 0);
+          if (id === targetId) { found = dialog.entity; break; }
+        }
+        if (!found) throw new Error(`канал ${channelId} не найден: getEntity: ${(e1 as Error).message}`);
+        entity = found;
       }
-      if (!foundEntity) throw new Error(`канал ${channelId} не найден в диалогах — убедись что аккаунт состоит в канале`);
-      for await (const msg of client.iterMessages(foundEntity, { limit })) {
+      for await (const msg of client.iterMessages(entity, { limit })) {
         const m = msg as Api.Message;
         if (!m.media) continue;
         const hasPhoto = m.media instanceof Api.MessageMediaPhoto;
