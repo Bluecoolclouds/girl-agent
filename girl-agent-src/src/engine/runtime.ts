@@ -711,6 +711,9 @@ export class Runtime extends EventEmitter {
           const target = this.pickReactionTarget(key, m.messageId);
           const reactDelay = Math.max(2_000, tick.delaySec * 1000 * 0.4 + Math.random() * 3_000);
           setTimeout(async () => {
+            if (this.userbotActionAvailable("readHistory")) {
+              await this.tg.readHistory?.(m.chatId).catch(() => {});
+            }
             await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
             this.emit("event", { type: "info", text: `❤ (acquaintance-react)` } as RuntimeEvent);
             appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ acquaintance-react`, m.fromId).catch(() => {});
