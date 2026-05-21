@@ -156,9 +156,13 @@ export async function behaviorTick(
   // warm vibe — снижает шанс случайного игнора
   const ignoreMul = ignoreMultiplier(communication, ignoreTendency);
 
-  // если СПИТ — игнор почти всегда
-  const sleepIgnoreMul = communication.notifications === "priority" ? 0.8 : communication.notifications === "muted" ? 1 : 0.9;
-  if (ctx.presence?.asleep && !ctx.presence.nightAwake && Math.random() < 0.85 * sleepIgnoreMul) {
+  // если СПИТ — игнор почти всегда (97-100% в зависимости от настройки уведомлений)
+  const sleepIgnoreChance = communication.notifications === "muted"
+    ? 1.0     // muted: никогда не просыпается
+    : communication.notifications === "priority"
+    ? 0.93    // priority: 7% шанс ответить (редко — важное)
+    : 0.98;   // normal: 2% шанс ответить во сне
+  if (ctx.presence?.asleep && !ctx.presence.nightAwake && Math.random() < sleepIgnoreChance) {
     return {
       shouldReply: false,
       shouldRead: false,
