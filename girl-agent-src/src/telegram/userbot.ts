@@ -450,6 +450,7 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       let entity: any;
       try {
         entity = await client.getEntity(BigInt(numId));
+        process.stderr.write(`[channel-scan] entity найден: id=${(entity as any)?.id} className=${(entity as any)?.className}\n`);
       } catch (e1) {
         // Fallback: перебираем диалоги
         const targetId = Math.abs(Number(String(channelId).replace(/^-100/, "")));
@@ -461,18 +462,45 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         if (!found) throw new Error(`канал ${channelId} не найден: getEntity: ${(e1 as Error).message}`);
         entity = found;
       }
+      let total = 0, withMedia = 0;
       for await (const msg of client.iterMessages(entity, { limit })) {
+        total++;
         const m = msg as Api.Message;
         if (!m.media) continue;
+        withMedia++;
+        const mediaClass = (m.media as any)?.className ?? typeof m.media;
+        if (total <= 5 || withMedia <= 3) {
+          process.stderr.write(`[channel-scan] msg id=${m.id} media=${mediaClass}\n`);
+        }
+        const caption = (m.message ?? "").replace(/\|/g, "—").replace(/\r?\n/g, " ").trim();
+
+        // Платный контент (Telegram Stars) — MediaPaidMedia содержит extendedMedia
+        if (m.media instanceof Api.MessageMediaPaidMedia) {
+          for (const ext of (m.media as Api.MessageMediaPaidMedia).extendedMedia ?? []) {
+            const inner = (ext as any)?.media;
+            if (!inner) continue;
+            const isPhoto = inner instanceof Api.MessageMediaPhoto;
+            const isVideo =
+              inner instanceof Api.MessageMediaDocument &&
+              inner.document instanceof Api.Document &&
+              (inner.document as Api.Document).mimeType?.startsWith("video/");
+            if (isPhoto || isVideo) {
+              yield { id: m.id, type: (isVideo ? "video" : "photo") as "photo" | "video", caption };
+              break; // одна запись на пост
+            }
+          }
+          continue;
+        }
+
         const hasPhoto = m.media instanceof Api.MessageMediaPhoto;
         const hasVideo =
           m.media instanceof Api.MessageMediaDocument &&
           m.media.document instanceof Api.Document &&
           (m.media.document as Api.Document).mimeType?.startsWith("video/");
         if (!hasPhoto && !hasVideo) continue;
-        const caption = (m.message ?? "").replace(/\|/g, "—").replace(/\r?\n/g, " ").trim();
         yield { id: m.id, type: (hasVideo ? "video" : "photo") as "photo" | "video", caption };
       }
+      process.stderr.write(`[channel-scan] итого сообщений=${total} с медиа=${withMedia}\n`);
     },
     async stop() {
       await client.disconnect();
