@@ -252,6 +252,8 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       client.addEventHandler(async (update: any) => {
         try {
           const cls = update?.className ?? update?.constructor?.name ?? "";
+          // diagnostic: log any reaction-related update class so we can see what GramJS actually delivers
+          if (/react/i.test(cls)) process.stderr.write(`[reaction-debug] Raw update: ${cls}\n`);
           if (cls !== "UpdateMessageReactions") return;
           const peer = update.peer;
           const isPrivate = peer?.className === "PeerUser";
