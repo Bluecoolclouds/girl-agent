@@ -1755,7 +1755,11 @@ export class Runtime extends EventEmitter {
         ], { temperature: 0.9, maxTokens: 600 });
         const reply = sanitizeModelReply(raw);
         if (!reply) return;
-        const bubbles = reply.split(/\n*---\n*/).map(s => s.trim()).filter(Boolean).slice(0, 2);
+        const { cleanedReply: delClean, actions: delActs } = this.cfg.mode === "userbot"
+          ? this.parseToolMarkers(reply)
+          : { cleanedReply: reply, actions: [] as string[] };
+        if (delActs.includes("READ")) await this.tg.readHistory?.(m.chatId).catch(() => {});
+        const bubbles = delClean.split(/\n*---\n*/).map(s => s.trim()).filter(Boolean).slice(0, 2);
         if (!bubbles.length) return;
         await this.sendBubbles(m.chatId, bubbles, hist, scope, true);
       } catch (e) {
@@ -1862,7 +1866,11 @@ export class Runtime extends EventEmitter {
           ], { temperature: 0.9, maxTokens: 400 });
           const reply = sanitizeModelReply(raw);
           if (!reply) return;
-          const bubbles = reply.split(/\n*---\n*/).map(s => s.trim()).filter(Boolean).slice(0, 2);
+          const { cleanedReply: emojiClean, actions: emojiActs } = this.cfg.mode === "userbot"
+            ? this.parseToolMarkers(reply)
+            : { cleanedReply: reply, actions: [] as string[] };
+          if (emojiActs.includes("READ")) await this.tg.readHistory?.(m.chatId).catch(() => {});
+          const bubbles = emojiClean.split(/\n*---\n*/).map(s => s.trim()).filter(Boolean).slice(0, 2);
           if (!bubbles.length) return;
           await this.sendBubbles(m.chatId, bubbles, hist, scope, true);
         } catch (e) {
