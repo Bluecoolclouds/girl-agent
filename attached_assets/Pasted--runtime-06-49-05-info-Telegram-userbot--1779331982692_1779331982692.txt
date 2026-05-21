@@ -1,0 +1,200 @@
+обытия runtime'а
+поиск...
+
+все
+Очистить
+06:49:05
+[info]
+Telegram userbot запущен. Профиль: кристина | presence: phone-attached | communication: Милая
+06:49:22
+[incoming]
+Как ты
+06:49:23
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":100,"annoyance":0,"cringe":0},"t":1779331763649}
+06:49:24
+[incoming]
+реакция 👎
+06:49:25
+[info]
+emoji-react 👎 (toxic/silent-mood): toxic about her: silent annoyance
+06:49:25
+[score]
+{"type":"score","score":{"interest":99,"trust":100,"attraction":99,"annoyance":8,"cringe":4},"t":1779331765373}
+06:49:32
+[incoming]
+снял реакцию
+06:49:32
+[info]
+emoji-react  (neutral/ignore): user removed reaction
+06:49:34
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+06:50:23
+[outgoing]
+норм
+06:50:26
+[incoming]
+реакция 👍
+06:50:26
+[info]
+emoji-react 👍 (neutral/ignore): silent skip (chance=0.24)
+06:50:27
+[outgoing]
+а ты че)
+06:50:36
+[incoming]
+Я тоже
+06:50:36
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":8,"cringe":4},"t":1779331836525}
+06:50:41
+[incoming]
+реакция 🤮
+06:50:43
+[info]
+emoji-react 🤮 (toxic/silent-mood): toxic about her: silent annoyance
+06:50:43
+[score]
+{"type":"score","score":{"interest":99,"trust":100,"attraction":98,"annoyance":15,"cringe":8},"t":1779331843560}
+06:51:19
+[outgoing]
+ну ладно)
+06:51:24
+[incoming]
+реакция ❤
+06:51:24
+[info]
+emoji-react ❤ (positive/silent-mood): silent skip (chance=0.28)
+06:51:24
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331884042}
+06:51:31
+[incoming]
+Ты красива кстати
+06:51:31
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331891254}
+06:51:44
+[incoming]
+🌹
+06:51:44
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331904942}
+06:49:05
+[info]
+Telegram userbot запущен. Профиль: кристина | presence: phone-attached | communication: Милая
+06:49:22
+[incoming]
+Как ты
+06:49:23
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":100,"annoyance":0,"cringe":0},"t":1779331763649}
+06:49:24
+[incoming]
+реакция 👎
+06:49:25
+[info]
+emoji-react 👎 (toxic/silent-mood): toxic about her: silent annoyance
+06:49:25
+[score]
+{"type":"score","score":{"interest":99,"trust":100,"attraction":99,"annoyance":8,"cringe":4},"t":1779331765373}
+06:49:32
+[incoming]
+снял реакцию
+06:49:32
+[info]
+emoji-react  (neutral/ignore): user removed reaction
+06:49:34
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+06:50:23
+[outgoing]
+норм
+06:50:26
+[incoming]
+реакция 👍
+06:50:26
+[info]
+emoji-react 👍 (neutral/ignore): silent skip (chance=0.24)
+06:50:27
+[outgoing]
+а ты че)
+06:50:36
+[incoming]
+Я тоже
+06:50:36
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":8,"cringe":4},"t":1779331836525}
+06:50:41
+[incoming]
+реакция 🤮
+06:50:43
+[info]
+emoji-react 🤮 (toxic/silent-mood): toxic about her: silent annoyance
+06:50:43
+[score]
+{"type":"score","score":{"interest":99,"trust":100,"attraction":98,"annoyance":15,"cringe":8},"t":1779331843560}
+06:51:19
+[outgoing]
+ну ладно)
+06:51:24
+[incoming]
+реакция ❤
+06:51:24
+[info]
+emoji-react ❤ (positive/silent-mood): silent skip (chance=0.28)
+06:51:24
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331884042}
+06:51:31
+[incoming]
+Ты красива кстати
+06:51:31
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331891254}
+06:51:44
+[incoming]
+🌹
+06:51:44
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331904942}
+06:51:58
+[outgoing]
+спасибо)
+06:52:04
+[outgoing]
+ты тоже симпатичный
+06:52:09
+[incoming]
+Спасибо)
+06:52:09
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331929758}
+06:52:16
+[outgoing]
+ну вот)
+06:52:20
+[incoming]
+💋
+06:52:20
+[score]
+{"type":"score","score":{"interest":100,"trust":100,"attraction":99,"annoyance":15,"cringe":8},"t":1779331940096}
+06:52:37
+[info]
+все пузыри — дубли, отправляю нейтральный филлер
+06:52:37
+[outgoing]
+хм
+06:52:37
+[info]
+neutral-filler вместо silent-fallback
+06:52:40
+[incoming]
+реакция 🤮
+06:52:41
+[info]
+emoji-react 🤮 (toxic/silent-mood): toxic about her: silent annoyance
+06:52:41
+[score]
+{"type":"score","score":{"interest":99,"trust":100,"attraction":98,"annoyance":21,"cringe":12},"t":1779331961420}

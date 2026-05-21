@@ -101,6 +101,8 @@ export class Runtime extends EventEmitter {
   private msgsSinceStageCheck = 0;
   /** Счётчик эмодзи-реакций в последние 60c для anti-flood. */
   private recentEmojiReactionTs: number[] = [];
+  /** Последняя реакция по ключу чата — передаётся в behaviorTick если пришла < 5 мин назад. */
+  private lastEmojiReactionByKey = new Map<string, { emoji: string; ts: number; herMessageSnippet?: string }>();
   private pendingReplyTimers = new Map<string, NodeJS.Timeout>();
   private pendingReplySeq = new Map<string, number>();
   private pendingReplyIncoming = new Map<string, IncomingMessage>();
@@ -752,9 +754,15 @@ export class Runtime extends EventEmitter {
       ? Date.now() - (this.lastHerReplyTs.get(key) ?? 0) < 5 * 60 * 1000
       : false;
     const recentIncomingIds = (this.incomingMsgIds.get(key) ?? []).map(e => ({ messageId: e.messageId, text: e.text }));
+    // Если < 5 мин назад была реакция от него — передаём LLM подсказку, она может упомянуть
+    const lastReact = this.lastEmojiReactionByKey.get(key);
+    const recentEmojiReaction = lastReact && Date.now() - lastReact.ts < 5 * 60 * 1000
+      ? { emoji: lastReact.emoji, herMessageSnippet: lastReact.herMessageSnippet }
+      : undefined;
+    if (recentEmojiReaction) this.lastEmojiReactionByKey.delete(key); // один раз
     const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, {
       presence, conflict, conflictColdActive: coldActive, blockHint, activeDialog, recentIncomingIds,
-      fromId: m.fromId
+      fromId: m.fromId, recentEmojiReaction
     });
     if (this.incomingSeq.get(key) !== seq) return;
     const baseDecision: DecisionSnapshot = {
@@ -1814,6 +1822,15 @@ export class Runtime extends EventEmitter {
       const histEntry = `(поставил реакцию ${m.emojiReaction.emoji}${targetSnippet})`;
       hist.push({ role: "user", content: histEntry, ts: Date.now() });
       this.histories.set(key, hist);
+      // Сохраняем для behaviorTick — если он напишет текст в ближайшие 5 мин, передадим подсказку.
+      this.lastEmojiReactionByKey.set(key, {
+        emoji: m.emojiReaction.emoji,
+        ts: now,
+        herMessageSnippet: herLastMessageText?.slice(0, 80)
+      });
+    } else {
+      // Снял реакцию — чистим
+      this.lastEmojiReactionByKey.delete(key);
     }
     if (decision.moodDelta && Object.keys(decision.moodDelta).length > 0) {
       const newScore = applyMoodDelta(rel.score, decision.moodDelta);

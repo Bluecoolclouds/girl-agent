@@ -185,19 +185,21 @@ function canColdReplyToToxic(ctx: EmojiReactionDecisionCtx): boolean {
 }
 
 function baseTextReplyChance(cat: EmojiCategory, ctx: EmojiReactionDecisionCtx): number {
-  let chance = 0.08;
+  // Базовые шансы по категории — реальные девушки иногда реагируют словами на реакции.
+  let chance = cat === "positive" ? 0.20
+    : cat === "funny"   ? 0.22
+    : cat === "sad"     ? 0.18
+    : cat === "neutral" ? 0.06
+    : 0.08;
   const init = ctx.communication?.initiative ?? "medium";
-  if (init === "high") chance += 0.1;
-  if (init === "low") chance -= 0.04;
+  if (init === "high") chance += 0.10;
+  if (init === "low") chance -= 0.05;
   const life = ctx.communication?.lifeSharing ?? "medium";
   if (life === "high") chance += 0.06;
-  if (ctx.stage === "long-term" || ctx.stage === "dating-stable") chance += 0.04;
-  if (ctx.stage === "met-irl-got-tg" || ctx.stage === "tg-given-cold") chance -= 0.07;
-  if (cat === "funny") chance += 0.06;
-  if (cat === "sad") chance += 0.04;
-  if (cat === "neutral") chance -= 0.04;
-  if (cat === "positive" && ctx.score.annoyance > 50) chance -= 0.07;
-  return Math.max(0, Math.min(0.5, chance));
+  if (ctx.stage === "long-term" || ctx.stage === "dating-stable") chance += 0.06;
+  if (ctx.stage === "met-irl-got-tg" || ctx.stage === "tg-given-cold") chance -= 0.10;
+  if (cat === "positive" && ctx.score.annoyance > 50) chance -= 0.10;
+  return Math.max(0, Math.min(0.55, chance));
 }
 
 function shouldReactBack(ctx: EmojiReactionDecisionCtx): boolean {
