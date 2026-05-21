@@ -337,11 +337,11 @@ export class Runtime extends EventEmitter {
     await appendSharedMemory(this.cfg.slug, this.cfg.tz, fromId, safe).catch(() => {});
   }
 
-  private requestedOutgoingMedia(text: string): "photo" | "video" | "voice" | "video_note" | undefined {
-    // Используем (?<![а-яёА-ЯЁ]) вместо \b — JS \b не работает с кириллицей
-    // (кирилл. символы не входят в \w, поэтому \b между двумя кир. символами никогда не совпадает)
+  private requestedOutgoingMedia(text: string): "video" | "voice" | "video_note" | undefined {
+    // Фото НЕ перехватываем — LLM сам решает через [SEND_PHOTO:tag] маркер.
+    // Только video/voice/video_note перехватываем для генерации отказа (их LLM не умеет отправлять).
+    // JS \b не работает с кириллицей, используем lookahead/lookbehind.
     const wr = (s: string) => new RegExp(`(?<![а-яёА-ЯЁ])(${s})(?![а-яёА-ЯЁ])`, "i");
-    if (wr("фото|фотку|фоточку|селфи|скинь себя|покажи себя|пришли фото|кинь фото|фото пришли").test(text)) return "photo";
     if (wr("видео|видос|запиши видео").test(text)) return "video";
     if (wr("голос|гс|войс|голосовое|скажи голосом").test(text)) return "voice";
     if (wr("кружок|кружочек|кругляш").test(text)) return "video_note";
@@ -653,24 +653,8 @@ export class Runtime extends EventEmitter {
     const requestedMedia = this.requestedOutgoingMedia(m.text);
     if (requestedMedia) {
       const scope = isPrimary ? "primary" : "acquaintance";
-      // Если просят фото и есть библиотека — шлём реальное фото
-      if (requestedMedia === "photo" && this.tg.sendPhoto) {
-        try {
-          const photo = await pickPhoto(this.cfg, incomingText, m.fromId ?? undefined);
-          if (photo) {
-            await this.tg.setTyping(m.chatId, true).catch(() => {});
-            await sleep(800 + Math.random() * 1200);
-            await this.tg.sendPhoto(m.chatId, photo.filePath, photo.caption);
-            this.emit("event", { type: "info", text: `sent photo: ${photo.filePath}`, chatId: m.chatId } as RuntimeEvent);
-            await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> sent photo ${photo.filePath}`, typeof m.chatId === "number" ? m.chatId : undefined);
-            if (m.fromId) await markPhotoSent(this.cfg, m.fromId, photo.filePath).catch(() => {});
-            return;
-          }
-        } catch (e) {
-          this.emit("event", { type: "error", text: `sendPhoto failed: ${silentErrorLabel(e)}` } as RuntimeEvent);
-        }
-      }
-      // Фото нет в библиотеке (или другой тип медиа) — генерируем отказ
+      // Видео/голос/кружок — LLM не умеет их отправлять, сразу генерируем отказ.
+      // Фото — идёт через обычный LLM-путь: агент сам решает через [SEND_PHOTO:tag].
       let bubbles: string[] = [];
       try {
         bubbles = await this.generateOutgoingMediaRefusal(requestedMedia, incomingText, scope, m.fromId);
