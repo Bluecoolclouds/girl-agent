@@ -1757,6 +1757,13 @@ export class Runtime extends EventEmitter {
     if (isPrimary) {
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `[emoji-react] он(${m.fromId}): ${m.emojiReaction.emoji} → ${decision.intent} (${decision.reason})`, m.fromId);
     }
+    // Записываем реакцию в историю диалога — чтобы LLM знал о ней при следующем текстовом сообщении.
+    if (!m.emojiReaction.removed) {
+      const targetSnippet = herLastMessageText ? ` на твоё сообщение: "${herLastMessageText.slice(0, 80)}"` : "";
+      const histEntry = `(поставил реакцию ${m.emojiReaction.emoji}${targetSnippet})`;
+      hist.push({ role: "user", content: histEntry, ts: Date.now() });
+      this.histories.set(key, hist);
+    }
     if (decision.moodDelta && Object.keys(decision.moodDelta).length > 0) {
       const newScore = applyMoodDelta(rel.score, decision.moodDelta);
       await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage }, m.fromId);
