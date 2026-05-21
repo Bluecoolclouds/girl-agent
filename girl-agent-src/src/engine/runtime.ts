@@ -338,10 +338,13 @@ export class Runtime extends EventEmitter {
   }
 
   private requestedOutgoingMedia(text: string): "photo" | "video" | "voice" | "video_note" | undefined {
-    if (/\b(фото|фотку|селфи|скинь себя|покажи себя)\b/i.test(text)) return "photo";
-    if (/\b(видео|видос|запиши видео)\b/i.test(text)) return "video";
-    if (/\b(голос|гс|войс|голосовое|скажи голосом)\b/i.test(text)) return "voice";
-    if (/\b(кружок|кружочек|кругляш)\b/i.test(text)) return "video_note";
+    // Используем (?<![а-яёА-ЯЁ]) вместо \b — JS \b не работает с кириллицей
+    // (кирилл. символы не входят в \w, поэтому \b между двумя кир. символами никогда не совпадает)
+    const wr = (s: string) => new RegExp(`(?<![а-яёА-ЯЁ])(${s})(?![а-яёА-ЯЁ])`, "i");
+    if (wr("фото|фотку|фоточку|селфи|скинь себя|покажи себя|пришли фото|кинь фото|фото пришли").test(text)) return "photo";
+    if (wr("видео|видос|запиши видео").test(text)) return "video";
+    if (wr("голос|гс|войс|голосовое|скажи голосом").test(text)) return "voice";
+    if (wr("кружок|кружочек|кругляш").test(text)) return "video_note";
     return undefined;
   }
 

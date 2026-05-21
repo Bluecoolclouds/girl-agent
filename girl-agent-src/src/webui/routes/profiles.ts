@@ -250,6 +250,11 @@ export function registerProfileRoutes(r: Router): void {
       rel.stage = transition.next;
       // Обновляем in-memory стадию в живом runtime (если запущен)
       bus.get(slug)?.setStage(transition.next);
+      // Если это primary контакт — синхронизируем config.json
+      if (targetId === cfg.ownerId) {
+        cfg.stage = transition.next as typeof cfg.stage;
+        await writeConfig(cfg);
+      }
     }
     await writeRelationship(slug, rel, targetId);
     const stageInfo = findStage(rel.stage);
