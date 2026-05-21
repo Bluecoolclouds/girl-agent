@@ -163,6 +163,148 @@ notifyOwnerId?: number;
 
 ---
 
+## 8. Цитата на конкретное сообщение ([REPLY_TO])
+
+LLM теперь может ответить с цитатой на последнее сообщение юзера — как кнопка «Ответить» в Telegram. Только для userbot режима. LLM решает сам когда использовать.
+
+---
+
+### `girl-agent-src/src/telegram/index.ts`
+
+**Строка 63** — расширена сигнатура `sendText`:
+```diff
+- sendText(chatId: number | string, text: string): Promise<number | undefined>;
++ sendText(chatId: number | string, text: string, replyToMessageId?: number): Promise<number | undefined>;
+```
+
+---
+
+### `girl-agent-src/src/telegram/userbot.ts`
+
+**Строка 290** — `sendMessage` теперь принимает `replyTo`:
+```diff
+- async sendText(chatId, text) {
+-   const msg = await client.sendMessage(peer, { message: text });
++ async sendText(chatId, text, replyToMessageId) {
++   const msg = await client.sendMessage(peer, {
++     message: text,
++     ...(replyToMessageId ? { replyTo: replyToMessageId } : {}),
++   });
+```
+
+---
+
+### `girl-agent-src/src/telegram/bot.ts`
+
+**Строка 81** — `sendMessage` Bot API принимает `reply_parameters`:
+```diff
+- async sendText(chatId, text) {
++ async sendText(chatId, text, replyToMessageId) {
++   const replyParams = replyToMessageId ? { reply_parameters: { message_id: replyToMessageId } } : {};
+    ...
+-   const msg = await bot.api.sendMessage(chatId as number, text);
++   const msg = await bot.api.sendMessage(chatId as number, text, replyParams as any);
+```
+
+---
+
+### `girl-agent-src/src/engine/runtime.ts`
+
+**Строка 351** — `sendBubbles` принимает `replyToMessageId?`:
+```diff
+- private async sendBubbles(..., typing = true): Promise<string[]>
++ private async sendBubbles(..., typing = true, replyToMessageId?: number): Promise<string[]>
+```
+
+**Строка 384** — только первый пузырь отправляется с цитатой:
+```ts
+// ДОБАВЛЕНО:
+const replyId = i === 0 ? replyToMessageId : undefined;
+const messageId = await this.tg.sendText(chatId, text, replyId);
+```
+
+**Строка 1461** — `parseToolMarkers` возвращает флаг `replyTo`:
+```diff
+- private parseToolMarkers(reply: string): { cleanedReply: string; actions: string[] }
++ private parseToolMarkers(reply: string): { cleanedReply: string; actions: string[]; replyTo: boolean }
+  // REPLY_TO добавлен в KNOWN, отфильтровывается из actions, возвращается как boolean
+```
+
+**Строка 943** — в `generateAndSend()` парсится и применяется `replyTo`:
+```ts
+// ДОБАВЛЕНО:
+const { cleanedReply, actions, replyTo } = ...parseToolMarkers(reply)...;
+const replyToMessageId = replyTo && incoming?.messageId ? incoming.messageId : undefined;
+const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing, replyToMessageId);
+```
+
+---
+
+### `girl-agent-src/src/engine/prompt.ts`
+
+**Строки 306** — добавлен маркер в список доступных действий:
+```
+// ДОБАВЛЕНО в # ДОСТУПНЫЕ ДЕЙСТВИЯ (userbot):
+- [REPLY_TO] — ответить с цитатой на его последнее сообщение (как кнопка «ответить» в тг).
+  Используй редко и натурально: несколько сообщений подряд / хочешь выделить фразу / прошло время.
+```
+
+---
+
+## 7. Emoji-реакции записываются в историю диалога
+
+Раньше реакции обрабатывались тихо (настроение, react-back) но не попадали в историю диалога. LLM не знал о реакции и говорил «не видела». Теперь каждая реакция записывается как синтетическая запись в историю.
+
+---
+
+### `girl-agent-src/src/engine/runtime.ts`
+
+**Строки 1763–1769** — в `handleEmojiReaction()`, после логирования, добавлено:
+```ts
+// ДОБАВЛЕНО (только для не-removed реакций):
+if (!m.emojiReaction.removed) {
+  const targetSnippet = herLastMessageText ? ` на твоё сообщение: "${herLastMessageText.slice(0, 80)}"` : "";
+  const histEntry = `(поставил реакцию ${m.emojiReaction.emoji}${targetSnippet})`;
+  hist.push({ role: "user", content: histEntry, ts: Date.now() });
+  this.histories.set(key, hist);
+}
+```
+
+---
+
+### `girl-agent-src/src/engine/prompt.ts`
+
+**После секции "РЕАКЦИИ И ЭДИТЫ"** — добавлена инструкция:
+```
+// ДОБАВЛЕНО:
+# СОБЫТИЯ В ИСТОРИИ ДИАЛОГА
+Если в истории есть строка "(поставил реакцию X на твоё сообщение: ...)" — это реальное событие.
+Ты её видела. Не говори "не видела". Реагируй по persona/stage.
+```
+
+---
+
+## 6. Bugfix: старые media-маршруты в profiles.ts перекрывали media.ts
+
+`profiles.ts` содержал устаревший блок маршрутов для `/photos` зарегистрированный раньше `media.ts`. Роутер хватал первый совпавший — GET возвращал `{files, index}` вместо `{photos}`, POST шёл на `/photos/upload` (бинарный, не base64). Медиатека в WebUI показывала пустой список.
+
+---
+
+### `girl-agent-src/src/webui/routes/profiles.ts`
+
+**Строки 347–412** — удалён весь блок «Фото-библиотека»:
+```diff
+- // Фото-библиотека
+- r.get("/api/profiles/:slug/photos", ...)    // возвращал {files, index}
+- r.post("/api/profiles/:slug/photos/upload", ...) // бинарный upload через хедер
+- r.put("/api/profiles/:slug/photos/index", ...)   // raw index edit
+- r.delete("/api/profiles/:slug/photos/:filename", ...) // только jpg/png/webp
+```
+
+Все эти маршруты теперь обрабатывает `media.ts` с правильным форматом и поддержкой видео.
+
+---
+
 ## 1. Per-contact relationship (отношения per-контакт)
 
 Раньше у всего профиля был один файл `relationship.md`. Теперь у каждого контакта свой файл в `data/<slug>/contacts/<fromId>/relationship.md`. Общий файл сохраняется как fallback для WebUI и headless-режима.
