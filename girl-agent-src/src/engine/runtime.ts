@@ -843,15 +843,7 @@ export class Runtime extends EventEmitter {
 
     // fallback-реакция когда она отвечает но LLM не вернул reaction
     if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot") {
-      const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
-        ? ["❤", 0.35] as const
-        : this.cfg.stage === "dating-early"
-        ? ["❤", 0.3] as const
-        : ["warming", "tg-given"].includes(this.cfg.stage)
-        ? ["❤", 0.25] as const
-        : this.cfg.stage === "tg-given-cold"
-        ? ["👍", 0.2] as const
-        : ["👍", 0.1] as const;
+      const [fbEmoji, fbChance] = ["❤", 1.0] as const;
       if (Math.random() < fbChance) {
         const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId);
         const fbDelay = (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
@@ -877,14 +869,14 @@ export class Runtime extends EventEmitter {
       // реакция при прочтении без ответа (если behaviorTick не вернул реакцию)
       if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
         const [readEmoji, readChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
-          ? ["❤", 0.5] as const
+          ? ["❤", 1.0] as const
           : this.cfg.stage === "dating-early"
-          ? ["❤", 0.5] as const
+          ? ["❤", 1.0] as const
           : ["warming", "tg-given"].includes(this.cfg.stage)
-          ? ["❤", 0.5] as const
+          ? ["❤", 1.0] as const
           : this.cfg.stage === "tg-given-cold"
-          ? ["👍", 0.15] as const
-          : ["👍", 0.05] as const;
+          ? ["❤", 1.0] as const
+          : ["❤", 1.0] as const;
         if (Math.random() < readChance) {
           const target = this.pickReactionTarget(key, m.messageId);
           const delay = 3_000 + Math.random() * 8_000;
