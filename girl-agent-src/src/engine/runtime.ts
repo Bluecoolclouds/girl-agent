@@ -701,6 +701,16 @@ export class Runtime extends EventEmitter {
       await writeRelationship(this.cfg.slug, contactRel, m.fromId);
       this.emit("event", { type: "score", score: contactRel.score } as RuntimeEvent);
       const tick = this.acquaintanceTick(romanticApproach);
+      // Реакция для acquaintance (100% для теста)
+      if (this.cfg.mode === "userbot") {
+        const target = this.pickReactionTarget(key, m.messageId);
+        const fbDelay = 2_000 + Math.random() * 5_000;
+        setTimeout(async () => {
+          await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
+          this.emit("event", { type: "info", text: `❤ (acquaintance-react)` } as RuntimeEvent);
+          appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ acquaintance-react`, m.fromId).catch(() => {});
+        }, fbDelay).unref?.();
+      }
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
     }
