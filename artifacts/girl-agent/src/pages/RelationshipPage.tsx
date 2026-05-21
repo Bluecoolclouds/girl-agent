@@ -86,16 +86,25 @@ export function RelationshipPage() {
     setEditing(true);
   };
 
+  const applyPatchResult = (r: { score: Record<string, number>; stage?: { id: string; num: number; label: string }; stageChanged?: boolean }) => {
+    setScore(r.score);
+    if (r.stage) {
+      setStage(r.stage);
+      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score, stage: r.stage!.id } : c));
+      if (r.stageChanged) toast(`Стадия → ${r.stage.num}. ${r.stage.label}`, "success");
+    } else {
+      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score } : c));
+    }
+  };
+
   const saveEdit = async () => {
     if (!cfg || !score) return;
     setSaving(true);
     try {
       const r = await api.patchRelationship(cfg.slug, editVals, selectedId ?? undefined);
-      setScore(r.score);
-      // Обновляем в списке контактов
-      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score } : c));
+      applyPatchResult(r);
       setEditing(false);
-      toast("Очки сохранены", "success");
+      if (!r.stageChanged) toast("Очки сохранены", "success");
     } catch (e) {
       toast(`Ошибка: ${(e as Error)?.message}`, "error");
     } finally {
@@ -108,8 +117,7 @@ export function RelationshipPage() {
     const next = Math.max(0, Math.min(100, (score[key] ?? 0) + delta));
     try {
       const r = await api.patchRelationship(cfg.slug, { [key]: next }, selectedId ?? undefined);
-      setScore(r.score);
-      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score } : c));
+      applyPatchResult(r);
     } catch (e) {
       toast(`Ошибка: ${(e as Error)?.message}`, "error");
     }

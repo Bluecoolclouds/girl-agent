@@ -8,6 +8,7 @@ import type { ProfileConfig } from "../../types.js";
 import { parseTelegramProxyInput } from "../../telegram/proxy-parse.js";
 import { bus } from "../runtime-bus.js";
 import { findStage } from "../../presets/stages.js";
+import { decideStageTransition } from "../../engine/stage-transitions.js";
 import { ensurePersonaPack, generatePersonaPack } from "../../engine/persona-gen.js";
 import { makeLLM } from "../../llm/index.js";
 import { applyLLMUpdate, describeLLM } from "../../config/llm-update.js";
@@ -236,8 +237,26 @@ export function registerProfileRoutes(r: Router): void {
         rel.score[k] = Math.max(0, Math.min(100, delta[k]));
       }
     }
+    // После ручного изменения очков — пересчитываем стадию.
+    // Используем herMessagesInStage=999 чтобы не блокировать переход по минимуму сообщений.
+    const transition = decideStageTransition({
+      currentStage: rel.stage as import("../../types.js").StageId,
+      score: rel.score,
+      herMessagesInStage: 999,
+      hisMessagesInStage: 999,
+      ignoresInStage: 0,
+    });
+    if (transition) {
+      rel.stage = transition.next;
+    }
     await writeRelationship(slug, rel, targetId);
-    return { ok: true, score: rel.score };
+    const stageInfo = findStage(rel.stage);
+    return {
+      ok: true,
+      score: rel.score,
+      stage: { id: stageInfo.id, num: stageInfo.num, label: stageInfo.label },
+      stageChanged: !!transition,
+    };
   });
 
   // Memory files

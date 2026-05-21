@@ -167,7 +167,7 @@ export const api = {
     return req<{ stage: { id: string; num: number; label: string }; score: { interest: number; trust: number; attraction: number; annoyance: number; cringe: number } }>("GET", `/api/profiles/${encodeURIComponent(slug)}/relationship${q}`);
   },
   async patchRelationship(slug: string, score: Partial<Record<string, number>>, fromId?: number) {
-    return req<{ ok: true; score: Record<string, number> }>("PATCH", `/api/profiles/${encodeURIComponent(slug)}/relationship`, { score, fromId });
+    return req<{ ok: true; score: Record<string, number>; stage?: { id: string; num: number; label: string }; stageChanged?: boolean }>("PATCH", `/api/profiles/${encodeURIComponent(slug)}/relationship`, { score, fromId });
   },
   async listMemoryFiles(slug: string) {
     return req<{ files: { path: string; size: number; mtime: number }[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/memory`);
