@@ -382,7 +382,9 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
           msgId: messageId,
           reaction: [new Api.ReactionEmoji({ emoticon: emoji })]
         }));
-      } catch { /* may fail if peer disabled reactions */ }
+      } catch (e: any) {
+        console.error(`[setReaction] FAILED chat=${chatId} msg=${messageId} emoji=${emoji}:`, e?.message ?? e);
+      }
     },
     async editText(chatId, messageId, newText) {
       try {
