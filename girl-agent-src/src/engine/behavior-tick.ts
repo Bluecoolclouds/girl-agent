@@ -124,7 +124,7 @@ export async function behaviorTick(
   const state = `stage=${cfg.stage} (${stage.label})\nscore=${JSON.stringify(rel.score)}\nbase_ignore=${stage.defaults.ignoreChance}\nbase_delay=${stage.defaults.replyDelaySec.join("..")}s\n${communicationDecisionState(communication)}\n${ignoreTendencyPrompt(ignoreTendency)}`;
   const reactionsHint = reactionMenu(cfg.stage, rel.score);
 
-  const history = recentHistory.slice(-8)
+  const history = recentHistory.slice(-6)
     .map(m => `${m.role === "user" ? "он" : "она"}: ${m.content}`).join("\n");
 
   if (ctx.activeDialog && !ctx.conflictColdActive) {
