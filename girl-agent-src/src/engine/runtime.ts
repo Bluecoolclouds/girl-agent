@@ -701,15 +701,24 @@ export class Runtime extends EventEmitter {
       await writeRelationship(this.cfg.slug, contactRel, m.fromId);
       this.emit("event", { type: "score", score: contactRel.score } as RuntimeEvent);
       const tick = this.acquaintanceTick(romanticApproach);
-      // Реакция для acquaintance (100% для теста)
+      // Реакция для acquaintance — после паузы "прочтения"
       if (this.cfg.mode === "userbot") {
-        const target = this.pickReactionTarget(key, m.messageId);
-        const fbDelay = 2_000 + Math.random() * 5_000;
-        setTimeout(async () => {
-          await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
-          this.emit("event", { type: "info", text: `❤ (acquaintance-react)` } as RuntimeEvent);
-          appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ acquaintance-react`, m.fromId).catch(() => {});
-        }, fbDelay).unref?.();
+        const reactChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
+          : this.cfg.stage === "dating-early" ? 0.5
+          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.45
+          : 0.35; // tg-given-cold и всё остальное
+        if (Math.random() < reactChance) {
+          const target = this.pickReactionTarget(key, m.messageId);
+          const readDelay = 4_000 + Math.random() * 10_000;
+          setTimeout(async () => {
+            if (this.userbotActionAvailable("readHistory")) {
+              await this.tg.readHistory?.(m.chatId).catch(() => {});
+            }
+            await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
+            this.emit("event", { type: "info", text: `❤ (acquaintance-react)` } as RuntimeEvent);
+            appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ acquaintance-react`, m.fromId).catch(() => {});
+          }, readDelay).unref?.();
+        }
       }
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
@@ -853,7 +862,15 @@ export class Runtime extends EventEmitter {
 
     // fallback-реакция когда она отвечает но LLM не вернул reaction
     if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot") {
-      const [fbEmoji, fbChance] = ["❤", 1.0] as const;
+      const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
+        ? ["❤", 0.5] as const
+        : this.cfg.stage === "dating-early"
+        ? ["❤", 0.5] as const
+        : ["warming", "tg-given"].includes(this.cfg.stage)
+        ? ["❤", 0.45] as const
+        : this.cfg.stage === "tg-given-cold"
+        ? ["❤", 0.35] as const
+        : ["❤", 0.35] as const;
       if (Math.random() < fbChance) {
         const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId);
         const fbDelay = (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
@@ -879,14 +896,14 @@ export class Runtime extends EventEmitter {
       // реакция при прочтении без ответа (если behaviorTick не вернул реакцию)
       if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
         const [readEmoji, readChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
-          ? ["❤", 1.0] as const
+          ? ["❤", 0.5] as const
           : this.cfg.stage === "dating-early"
-          ? ["❤", 1.0] as const
+          ? ["❤", 0.5] as const
           : ["warming", "tg-given"].includes(this.cfg.stage)
-          ? ["❤", 1.0] as const
+          ? ["❤", 0.45] as const
           : this.cfg.stage === "tg-given-cold"
-          ? ["❤", 1.0] as const
-          : ["❤", 1.0] as const;
+          ? ["❤", 0.35] as const
+          : ["❤", 0.35] as const;
         if (Math.random() < readChance) {
           const target = this.pickReactionTarget(key, m.messageId);
           const delay = 3_000 + Math.random() * 8_000;
