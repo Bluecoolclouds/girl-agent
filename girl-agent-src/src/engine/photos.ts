@@ -68,3 +68,21 @@ export async function pickPhoto(cfg: ProfileConfig, mood = ""): Promise<PhotoEnt
   const pool = tagged.length ? tagged : photos;
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+/** Выбирает фото по явному тегу. Если тег не совпал — берём любое из библиотеки. */
+export async function pickPhotoByTag(cfg: ProfileConfig, tag: string): Promise<PhotoEntry | undefined> {
+  const photos = await listPhotos(cfg);
+  if (!photos.length) return undefined;
+  const t = tag.trim().toLowerCase();
+  const matched = t ? photos.filter(p => p.tags.some(pt => pt.toLowerCase() === t)) : [];
+  const pool = matched.length ? matched : photos;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/** Возвращает уникальные теги из всей библиотеки. */
+export async function listPhotoTags(cfg: ProfileConfig): Promise<string[]> {
+  const photos = await listPhotos(cfg);
+  const tags = new Set<string>();
+  for (const p of photos) for (const t of p.tags) tags.add(t);
+  return [...tags].sort();
+}

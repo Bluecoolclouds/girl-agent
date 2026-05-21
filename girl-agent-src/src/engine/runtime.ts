@@ -25,7 +25,7 @@ import { mineUnminedDailyLogs } from "./memory-palace.js";
 import { describeIncomingMedia, imagePartFromMedia, memeDetectionInstruction } from "./media.js";
 import { isQuotaExhaustedError, looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
 import { addStickerToLibrary, pickSticker } from "./stickers.js";
-import { pickPhoto } from "./photos.js";
+import { pickPhoto, pickPhotoByTag, listPhotoTags } from "./photos.js";
 import { EventEmitter } from "node:events";
 import { applyLLMUpdate, describeLLM } from "../config/llm-update.js";
 import { injectTypos, pickTypoIntensity } from "./typos.js";
@@ -1463,7 +1463,7 @@ export class Runtime extends EventEmitter {
    * - известные маркеры (BLOCK/UNBLOCK/READ/STICKER) — исполняем.
    */
   private parseToolMarkers(reply: string): { cleanedReply: string; actions: string[]; replyTo: boolean } {
-    const KNOWN = new Set(["BLOCK", "UNBLOCK", "READ", "STICKER", "REPLY_TO"]);
+    const KNOWN = new Set(["BLOCK", "UNBLOCK", "READ", "STICKER", "REPLY_TO", "SEND_PHOTO"]);
     const lines = reply.split("\n");
     const actions: string[] = [];
     let firstContentLine = 0;
@@ -1535,6 +1535,24 @@ export class Runtime extends EventEmitter {
             if (sticker) {
               await this.tg.sendSticker?.(chatId, sticker.fileId);
               this.emit("event", { type: "info", text: `AI tool: sent sticker ${chatId}`, chatId } as RuntimeEvent);
+            }
+          }
+          break;
+        case "SEND_PHOTO":
+          if (this.tg.sendPhoto) {
+            try {
+              const photo = await pickPhotoByTag(this.cfg, arg ?? "");
+              if (photo) {
+                await this.tg.setTyping(chatId, true).catch(() => {});
+                await sleep(600 + Math.random() * 1000);
+                await this.tg.sendPhoto(chatId, photo.filePath, photo.caption);
+                this.emit("event", { type: "info", text: `AI tool: sent photo [${arg ?? "any"}] → ${photo.filePath}`, chatId } as RuntimeEvent);
+                await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> AI SEND_PHOTO [${arg ?? "any"}] ${photo.filePath}`, typeof chatId === "number" ? chatId : undefined).catch(() => {});
+              } else {
+                this.emit("event", { type: "info", text: `AI tool: SEND_PHOTO — библиотека пуста, пропускаю`, chatId } as RuntimeEvent);
+              }
+            } catch (e) {
+              this.emit("event", { type: "error", text: `SEND_PHOTO failed: ${silentErrorLabel(e)}`, chatId } as RuntimeEvent);
             }
           }
           break;

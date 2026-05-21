@@ -1,5 +1,6 @@
 import type { ProfileConfig } from "../types.js";
 import { readSharedMemory, searchDailySummaries, searchSharedMemory, readMd, readRelationship } from "../storage/md.js";
+import { listPhotoTags } from "./photos.js";
 import { computeHormones, hormonesMd } from "./hormones.js";
 import { computePresenceProfile } from "./presence.js";
 import { dailyLifePromptFragment, type DailyLife } from "./daily-life.js";
@@ -217,11 +218,12 @@ export interface BuildPromptCtx {
 }
 
 export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx = {}): Promise<string> {
-  const [persona, speech, boundaries, relRaw] = await Promise.all([
+  const [persona, speech, boundaries, relRaw, photoTags] = await Promise.all([
     readMd(cfg.slug, "persona.md"),
     readMd(cfg.slug, "speech.md"),
     readMd(cfg.slug, "communication.md"),
-    readRelationship(cfg.slug, ctx.fromId)
+    readRelationship(cfg.slug, ctx.fromId),
+    cfg.mode === "userbot" ? listPhotoTags(cfg).catch(() => [] as string[]) : Promise.resolve([] as string[])
   ]);
   const isAcquaintance = ctx.relationshipScope === "acquaintance";
   const effectiveStageId = isAcquaintance ? "tg-given-cold" : (relRaw.stage || cfg.stage);
@@ -294,6 +296,9 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
   const ignoreTendency = ignoreTendencyPrompt(cfg.ignoreTendency);
 
   // Userbot tools available to AI
+  const photoTagList = photoTags.length > 0
+    ? `Доступные теги в медиатеке: ${photoTags.map(t => `«${t}»`).join(", ")}. Используй один из них в маркере.`
+    : "Медиатека пустая — маркер [SEND_PHOTO] пришлёт случайное фото если оно есть.";
   const userbotTools = cfg.mode === "userbot" ? `# ДОСТУПНЫЕ ДЕЙСТВИЯ (userbot)
 Ты можешь выполнять действия в Telegram. Чтобы выполнить действие, напиши в начале ответа один из маркеров:
 - [BLOCK] — заблокировать пользователя
@@ -301,11 +306,12 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
 - [READ] — отметить сообщения прочитанными (left-on-read)
 - [STICKER] — отправить стикер вместо текста (если не хочешь писать)
 - [REPLY_TO] — ответить с цитатой на его последнее сообщение (как кнопка «ответить» в тг). Используй редко и натурально: когда он написал несколько сообщений подряд и ты хочешь ответить именно на конкретное; когда хочешь подчеркнуть что обратила внимание на определённую фразу; когда прошло время и цитата помогает вернуть контекст. Не используй на каждое сообщение — выглядит странно.
+- [SEND_PHOTO:тег] — отправить реальное фото из медиатеки. Используй когда УМЕСТНО послать фото: когда он просит, когда ты обещала, когда фото органично вписывается в диалог (например, рассказываешь про тренировку → [SEND_PHOTO:gym]). ${photoTagList} ВАЖНО: маркер отправляет только если есть файл с таким тегом — если не уверена, лучше просто намекни словами. НЕ используй в групповых чатах. После маркера можешь написать подпись/комментарий — он уйдёт отдельным сообщением.
 
 # КРИТИЧЕСКИ ВАЖНО ПРО МАРКЕРЫ
 Доступны ТОЛЬКО маркеры выше. Не выдумывай свои маркеры — НЕ существует [EDIT_LAST], [EDIT], [DELETE], [REACT], [REPLY], [FORWARD], [REPORT] и любых других. Если попробуешь их написать — они уйдут юзеру как обычный текст и опалят тебя.
-Маркер должен быть строго в начале ответа на отдельной строке: открывающая скобка, заглавные буквы латиницей, закрывающая скобка, перенос строки, потом твой ответ (если нужен). Можно несколько маркеров подряд.
-Пример: "[READ]\n[BLOCK]\nты задолбал"
+Маркер должен быть строго в начале ответа на отдельной строке: открывающая скобка, заглавные буквы латиницей, закрывающая скобка, закрывающая скобка после двоеточия с тегом, перенос строки, потом твой ответ (если нужен). Можно несколько маркеров подряд.
+Пример: "[READ]\n[BLOCK]\nты задолбал" или "[SEND_PHOTO:selfie]\nвот я сегодня :)"
 
 # РЕАКЦИИ И ЭДИТЫ (важно)
 Ты НЕ можешь поставить реакцию на сообщение, редактировать своё предыдущее сообщение, удалять, форвардить или закреплять — это решает behavior-layer сам. НЕ пиши мета-текст про эти действия в ответе: запрещены формулировки типа "(реакция: ...)", "(ставит реакцию X)", "(реакция на сообщение: X)", "*реагирует X*", "*ставит лайк*", "редактирую: ...", "исправляю: ...". Если хочется поставить реакцию вместо ответа — просто молчи, система сама решит и поставит. Если хочется исправить только что отправленный текст — лучше пришли уточнение следующим сообщением ("*в смысле X", "то есть X").
