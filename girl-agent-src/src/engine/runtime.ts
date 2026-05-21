@@ -697,6 +697,9 @@ export class Runtime extends EventEmitter {
     if (!isPrimary) {
       const romanticApproach = this.isRomanticApproach(incomingText);
       if (await this.maybeBlockAfterBoundary(m.chatId, incomingText, romanticApproach)) return;
+      // Создаём/обновляем файл контакта чтобы он появился в WebUI
+      await writeRelationship(this.cfg.slug, contactRel, m.fromId);
+      this.emit("event", { type: "score", score: contactRel.score } as RuntimeEvent);
       const tick = this.acquaintanceTick(romanticApproach);
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
