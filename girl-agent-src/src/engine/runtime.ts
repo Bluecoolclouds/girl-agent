@@ -1491,7 +1491,21 @@ export class Runtime extends EventEmitter {
       break;
     }
 
-    const cleanedReply = lines.slice(firstContentLine).join("\n").trim();
+    // Второй проход: ищем inline-маркеры в оставшемся тексте (LLM иногда ставит маркер в конец строки).
+    // Паттерн: [KNOWN_ACTION] или [KNOWN_ACTION:arg] в любом месте строки.
+    const inlineMarkerRe = /\[([A-Z_]+)(?::([^\]]*))?\]/g;
+    const bodyLines = lines.slice(firstContentLine).map(line => {
+      return line.replace(inlineMarkerRe, (match, action: string, arg?: string) => {
+        if (KNOWN.has(action)) {
+          actions.push(arg ? `${action}:${arg}` : action);
+          return "";
+        }
+        // неизвестный inline маркер — вырезаем без выполнения
+        this.emit("event", { type: "info", text: `LLM inline hallucinated marker [${action}] — вырезан` } as RuntimeEvent);
+        return "";
+      });
+    });
+    const cleanedReply = bodyLines.join("\n").replace(/\s{2,}/g, " ").trim();
     const replyTo = actions.includes("REPLY_TO");
     const filteredActions = actions.filter(a => a !== "REPLY_TO");
     return { cleanedReply, actions: filteredActions, replyTo };
