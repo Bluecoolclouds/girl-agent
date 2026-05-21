@@ -75,19 +75,18 @@ ${history}
 НОВОЕ сообщение от него:
 """${incoming}"""
 
-${reactionsHint}
-${formatIncomingIds(ctx.recentIncomingIds)}
+${ctx.recentIncomingIds?.length ? reactionsHint + "\n" + formatIncomingIds(ctx.recentIncomingIds) : ""}
 
 Реши и верни СТРОГО JSON:
 {
-  "intent": "reply" | "ignore" | "short" | "left-on-read" | "leave-chat" | "reaction-only",
+  "intent": "reply" | "ignore" | "short" | "left-on-read" | "leave-chat"${ctx.recentIncomingIds?.length ? ` | "reaction-only"` : ""},
   "shouldReply": boolean,
   "shouldRead": boolean (даже если не отвечает, прочитать и поставить галочки? left-on-read=false, ignore=true если она зашла и прочитала),
   "delaySec": число (0..3600 секунд. Если она офлайн/занята/конфликт — большие задержки нормальны. Если активный диалог — маленькие.),
   "bubbles": число (1..6),
-  "typing": boolean,
+  "typing": boolean,${ctx.recentIncomingIds?.length ? `
   "reaction": "" или ОДИН эмодзи из доступного списка выше. Не из запрещённого!,
-  "reactionTargetMessageId": ID сообщения из списка ниже, на которое ставишь реакцию. Девушки в тг иногда реагируют на более раннее сообщение в бурсте — например он рассказал две вещи, она вернулась позже и поставила реакцию на первое. Не используй без reaction.,
+  "reactionTargetMessageId": ID сообщения из списка выше, на которое ставишь реакцию. Не используй без reaction.,` : ""}
   "ignoreReason": строка или "",
   "moodDelta": { "interest": число, "trust": число, "attraction": число, "annoyance": число, "cringe": число }
 }
@@ -105,9 +104,9 @@ ${formatIncomingIds(ctx.recentIncomingIds)}
 - Если в сообщении кринж/токсик/нарушение boundaries — annoyance растёт, может быть ignore или leave-chat.
 - Если милое/уместное на тёплой стадии — interest и attraction +.
 - Длинная простыня от него — bubbles её ответа НЕ становится больше; скорее наоборот.
-- moodDelta: маленькие числа -10..+10.
+- moodDelta: маленькие числа -10..+10.${ctx.recentIncomingIds?.length ? `
 - Реакции — реальные девушки 2026 чаще ставят TG-реакцию чем эмодзи в текст. Если сообщение цепануло, а отвечать не хочется — "intent":"reaction-only", "shouldReply":false, "reaction":"...". По умолчанию reaction="".
-- ВАЖНО: реакция должна соответствовать её отношению. Влюблённая НЕ ставит 🤡 на мем — она поставит 😂/❤ или мило посмеётся текстом. Холодная НЕ ставит ❤.
+- ВАЖНО: реакция должна соответствовать её отношению. Влюблённая НЕ ставит 🤡 на мем — она поставит 😂/❤ или мило посмеётся текстом. Холодная НЕ ставит ❤.` : ""}
 - НЕ оборачивай в markdown. Только JSON.`;
 
 export async function behaviorTick(
