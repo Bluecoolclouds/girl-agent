@@ -96,7 +96,7 @@ export const STAGE_PRESETS: StagePreset[] = [
 export function findStage(id: string | number): StagePreset {
   if (typeof id === "number" || /^\d+$/.test(String(id))) {
     const num = Number(id);
-    return STAGE_PRESETS.find(s => s.num === num) ?? STAGE_PRESETS[1]!;
+    return STAGE_PRESETS.find(s => s.num === num) ?? STAGE_PRESETS[0]!;
   }
-  return STAGE_PRESETS.find(s => s.id === id) ?? STAGE_PRESETS[1]!;
+  return STAGE_PRESETS.find(s => s.id === id) ?? STAGE_PRESETS[0]!;
 }

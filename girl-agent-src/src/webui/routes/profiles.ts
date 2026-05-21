@@ -210,7 +210,7 @@ export function registerProfileRoutes(r: Router): void {
         if (TG_SERVICE_IDS.has(fromId)) continue;
         try {
           const rel = await readRelationship(slug, fromId);
-          contacts.push({ fromId, stage: rel.stage, score: rel.score, isPrimary: fromId === cfg.ownerId });
+          contacts.push({ fromId, stage: rel.stage || cfg.stage, score: rel.score, isPrimary: fromId === cfg.ownerId });
         } catch { /* skip unreadable */ }
       }
     } catch { /* no contacts dir */ }
@@ -223,7 +223,7 @@ export function registerProfileRoutes(r: Router): void {
     if (!cfg) throw new HttpError(404, "profile not found");
     const fromId = query?.fromId ? Number(query.fromId) : (cfg.ownerId ?? undefined);
     const rel = await readRelationship(slug, fromId);
-    const stage = findStage(rel.stage);
+    const stage = findStage(rel.stage || cfg.stage);
     return { stage: { id: stage.id, num: stage.num, label: stage.label }, score: rel.score };
   });
 
