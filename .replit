@@ -56,13 +56,13 @@ outputType = "webview"
 name = "Girl Agent Backend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd girl-agent-src && GIRL_AGENT_PORT=3000 node --import tsx/esm src/cli.ts --host=0.0.0.0 --port=3000 --no-browser"
-waitForPort = 3000
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd girl-agent-src && GIRL_AGENT_PORT=3000 node --import ./node_modules/tsx/dist/esm/index.cjs src/cli.ts --host=0.0.0.0 --port=3000 --no-browser"
+waitForPort = 3000
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -75,11 +75,7 @@ timeoutMs = 20000
 
 [[ports]]
 localPort = 3000
-externalPort = 3002
-
-[[ports]]
-localPort = 3001
-externalPort = 3001
+externalPort = 3000
 
 [[ports]]
 localPort = 5000
