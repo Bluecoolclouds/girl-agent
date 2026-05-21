@@ -128,9 +128,9 @@ async function pickWithDedup(cfg: ProfileConfig, pool: PhotoEntry[], fromId?: nu
   if (unsent.length > 0) {
     return unsent[Math.floor(Math.random() * unsent.length)];
   }
-  // Все фото в пуле уже отправлены — сбрасываем историю для этого контакта и берём заново
-  await resetSentPhotos(cfg, fromId);
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Все фото в пуле уже отправлены этому контакту — возвращаем undefined.
+  // Вызывающий код запустит generateOutgoingMediaRefusal.
+  return undefined;
 }
 
 /** Возвращает уникальные теги из всей библиотеки. */
