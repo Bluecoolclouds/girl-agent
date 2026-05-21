@@ -4,6 +4,165 @@
 
 ---
 
+## 5. Уведомления владельцу при прогреве контакта
+
+Когда контакт переходит на более тёплую стадию (direction = "up"), бот отправляет Telegram-сообщение на указанный `notifyOwnerId`. Если `notifyOwnerId` не задан — используется `ownerId`. Если оба пустые — уведомлений нет.
+
+**Формат уведомления:**
+```
+🔔 girl-agent: смена стадии
+Профиль: Кристина (кристина)
+Контакт ID: 123456789
+прогревается 🌡 → тёплый 🔥
+Причина: interest+trust threshold reached
+Интерес: 45 | Доверие: 30 | Влечение: 20
+```
+
+---
+
+### `girl-agent-src/src/types.ts`
+
+**Строка 142** — добавлено новое поле после `ownerId`:
+
+```ts
+// ДОБАВЛЕНО:
+/** Telegram ID для уведомлений о прогреве контактов. Если не задан — уведомления не отправляются. */
+notifyOwnerId?: number;
+```
+
+---
+
+### `girl-agent-src/src/storage/md.ts`
+
+**Строка 98** — в `readConfig()`, добавлена нормализация при чтении:
+
+```ts
+// ДОБАВЛЕНО (после строки с ownerId):
+const notifyOwnerId = normalizeOwnerId(parsed.notifyOwnerId);
+```
+
+**Строка 108** — в `readConfig()`, добавлено в возвращаемый объект:
+
+```ts
+// ДОБАВЛЕНО в return { ... }:
+notifyOwnerId,
+```
+
+**Строки 120–126** — `writeConfig()` переписан для сохранения `notifyOwnerId`:
+
+```diff
+- const ownerId = normalizeOwnerId(cfg.ownerId ?? process.env.GIRL_AGENT_OWNER_ID);
+- const normalized = ownerId === undefined
+-   ? { ...cfg, ownerId: undefined, ignoreTendency: ... }
+-   : { ...cfg, ownerId, ignoreTendency: ... };
++ const ownerId = normalizeOwnerId(cfg.ownerId ?? process.env.GIRL_AGENT_OWNER_ID);
++ const notifyOwnerId = normalizeOwnerId(cfg.notifyOwnerId);
++ const normalized = {
++   ...cfg,
++   ownerId: ownerId ?? undefined,
++   notifyOwnerId: notifyOwnerId ?? undefined,
++   ignoreTendency: normalizeIgnoreTendency(cfg.ignoreTendency),
++ };
+```
+
+---
+
+### `girl-agent-src/src/webui/routes/profiles.ts`
+
+**Строка 87** — в PATCH `/api/profiles/:slug` добавлена обработка поля:
+
+```ts
+// ДОБАВЛЕНО (после строки с ownerId):
+if (incoming.notifyOwnerId !== undefined) merged.notifyOwnerId = normalizeOwnerId(incoming.notifyOwnerId);
+```
+
+---
+
+### `girl-agent-src/src/engine/runtime.ts`
+
+**Строки 1603–1605** — в `checkStageTransition()`, после логирования перехода добавлен вызов уведомления:
+
+```ts
+// ДОБАВЛЕНО (после appendSessionLog):
+if (decision.direction === "up") {
+  await this.sendOwnerStageNotification(fromId, oldStage, decision.next, rel.score, decision.reason).catch(() => {});
+}
+```
+
+**Строки 1609–1639** — добавлен новый приватный метод (после закрывающей скобки `checkStageTransition`):
+
+```ts
+// ДОБАВЛЕНО — новый метод класса Runtime:
+private async sendOwnerStageNotification(
+  contactId: number,
+  oldStage: string,
+  newStage: string,
+  score: import("../types.js").RelationshipScore,
+  reason: string
+): Promise<void> {
+  const notifyId = this.cfg.notifyOwnerId ?? this.cfg.ownerId;
+  if (!notifyId) return;
+  const STAGE_LABELS: Record<string, string> = {
+    "met-irl-got-tg": "познакомились",
+    "tg-given-cold": "холодный ❄️",
+    "tg-given-warming": "прогревается 🌡",
+    "convinced": "тёплый 🔥",
+    "first-date-done": "горячий 💰",
+    "dating-early": "покупатель 💳",
+    "dating-stable": "постоянный ⭐",
+    "long-term": "VIP 👑",
+    "dumped": "заблокирован ❌",
+  };
+  const label = (s: string) => STAGE_LABELS[s] ?? s;
+  const text = [
+    `🔔 girl-agent: смена стадии`,
+    `Профиль: ${this.cfg.name} (${this.cfg.slug})`,
+    `Контакт ID: ${contactId}`,
+    `${label(oldStage)} → ${label(newStage)}`,
+    `Причина: ${reason}`,
+    `Интерес: ${score.interest} | Доверие: ${score.trust} | Влечение: ${score.attraction}`,
+  ].join("\n");
+  await this.tg.sendText(notifyId, text).catch(() => {});
+}
+```
+
+---
+
+### `artifacts/girl-agent/src/lib/api.ts`
+
+**Строка 20** — добавлено в интерфейс `ProfileConfig` (после `ownerId`):
+
+```ts
+// ДОБАВЛЕНО:
+notifyOwnerId?: number;
+```
+
+---
+
+### `artifacts/girl-agent/src/pages/ConfigurationPage.tsx`
+
+**Строки 179–183** — добавлен новый блок после поля Owner ID:
+
+```tsx
+// ДОБАВЛЕНО (после </div> блока Owner ID):
+<div className="form-row">
+  <label>Notify ID (уведомления о прогреве)</label>
+  <input
+    className="input"
+    type="number"
+    value={merged.notifyOwnerId ?? ""}
+    onChange={e => pf("notifyOwnerId", Number(e.target.value) || undefined)}
+    placeholder="Telegram ID для уведомлений — если пусто, уведомления выключены"
+  />
+  <div className="hint">
+    Когда контакт переходит на более тёплую стадию — бот пришлёт уведомление на этот ID.
+    Если оставить пустым — уведомления выключены.
+  </div>
+</div>
+```
+
+---
+
 ## 1. Per-contact relationship (отношения per-контакт)
 
 Раньше у всего профиля был один файл `relationship.md`. Теперь у каждого контакта свой файл в `data/<slug>/contacts/<fromId>/relationship.md`. Общий файл сохраняется как fallback для WebUI и headless-режима.
