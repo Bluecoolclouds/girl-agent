@@ -251,10 +251,11 @@ export interface BuildPromptCtx {
 }
 
 export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx = {}): Promise<string> {
-  const [persona, speech, boundaries, relRaw, photoTags] = await Promise.all([
+  const [persona, speech, communicationMd, boundariesMd, relRaw, photoTags] = await Promise.all([
     readMd(cfg.slug, "persona.md"),
     readMd(cfg.slug, "speech.md"),
     readMd(cfg.slug, "communication.md"),
+    readMd(cfg.slug, "boundaries.md"),
     readRelationship(cfg.slug, ctx.fromId),
     cfg.mode === "userbot" ? listPhotoTags(cfg).catch(() => [] as string[]) : Promise.resolve([] as string[])
   ]);
@@ -367,7 +368,8 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
     userbotTools,
     `## persona.md`, persona,
     `## speech.md`, speech,
-    `## boundaries.md`, boundaries,
+    `## communication.md`, communicationMd,
+    boundariesMd.trim() ? `## boundaries.md\n${boundariesMd}` : "",
     `## hormones (текущий срез — ВЛИЯЕТ на тон ответа)`, hormonesMd(horm),
     dailyLife,
     conflict,
