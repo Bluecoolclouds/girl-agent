@@ -1548,6 +1548,8 @@ export class Runtime extends EventEmitter {
             if (sticker) {
               await this.tg.sendSticker?.(chatId, sticker.fileId);
               this.emit("event", { type: "info", text: `AI tool: sent sticker ${chatId}`, chatId } as RuntimeEvent);
+            } else {
+              this.emit("event", { type: "info", text: `AI tool: [STICKER] — библиотека стикеров пустая, стикер не отправлен`, chatId } as RuntimeEvent);
             }
           }
           break;
