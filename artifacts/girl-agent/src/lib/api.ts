@@ -159,8 +159,12 @@ export const api = {
   async generatePersona(slug: string, data: { name?: string; age?: number; nationality?: "RU" | "UA"; notes?: string } = {}) {
     return req<{ ok: true; busySchedule: unknown[] }>("POST", `/api/profiles/${encodeURIComponent(slug)}/generate-persona`, data);
   },
-  async getRelationship(slug: string) {
-    return req<{ stage: { id: string; num: number; label: string }; score: { interest: number; trust: number; attraction: number; annoyance: number; cringe: number } }>("GET", `/api/profiles/${encodeURIComponent(slug)}/relationship`);
+  async listContacts(slug: string) {
+    return req<{ contacts: { fromId: number; stage: string; score: Record<string, number>; isPrimary: boolean }[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/contacts`);
+  },
+  async getRelationship(slug: string, fromId?: number) {
+    const q = fromId ? `?fromId=${fromId}` : "";
+    return req<{ stage: { id: string; num: number; label: string }; score: { interest: number; trust: number; attraction: number; annoyance: number; cringe: number } }>("GET", `/api/profiles/${encodeURIComponent(slug)}/relationship${q}`);
   },
   async patchRelationship(slug: string, score: Partial<Record<string, number>>, fromId?: number) {
     return req<{ ok: true; score: Record<string, number> }>("PATCH", `/api/profiles/${encodeURIComponent(slug)}/relationship`, { score, fromId });

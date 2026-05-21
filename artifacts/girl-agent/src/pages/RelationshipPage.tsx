@@ -12,11 +12,15 @@ const SCORES: { key: string; label: string; negative?: boolean }[] = [
 ];
 
 interface ScorePoint { t: number; values: Record<string, number> }
+interface Contact { fromId: number; stage: string; score: Record<string, number>; isPrimary: boolean }
 
 export function RelationshipPage() {
   const cfg = useStore(s => s.activeConfig);
   const showSetupFlow = useStore(s => s.showSetupFlow);
   const toast = useStore(s => s.toast);
+
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [stage, setStage] = useState<{ id: string; num: number; label: string } | null>(null);
   const [score, setScore] = useState<Record<string, number> | null>(null);
   const [history, setHistory] = useState<ScorePoint[]>([]);
@@ -25,24 +29,57 @@ export function RelationshipPage() {
   const [editVals, setEditVals] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
 
+  // Загрузка списка контактов при смене профиля
+  useEffect(() => {
+    if (!cfg) return;
+    setContacts([]);
+    setSelectedId(null);
+    setStage(null);
+    setScore(null);
+    setHistory([]);
+    setEditing(false);
+    void api.listContacts(cfg.slug)
+      .then(r => {
+        setContacts(r.contacts);
+        // Выбираем primary по умолчанию, иначе первый
+        const primary = r.contacts.find(c => c.isPrimary) ?? r.contacts[0];
+        if (primary) setSelectedId(primary.fromId);
+      })
+      .catch(() => {});
+  }, [cfg?.slug]);
+
+  // Загрузка данных при смене выбранного контакта
+  useEffect(() => {
+    if (!cfg) return;
+    setStage(null);
+    setScore(null);
+    setNotes("");
+    setEditing(false);
+    const fid = selectedId ?? undefined;
+    void api.getRelationship(cfg.slug, fid)
+      .then(r => { setStage(r.stage); setScore(r.score); })
+      .catch(() => {});
+    void api.readMemoryFile(cfg.slug, selectedId ? `contacts/${selectedId}/relationship.md` : "relationship.md")
+      .then(r => setNotes(r.content))
+      .catch(() => setNotes(""));
+  }, [cfg?.slug, selectedId]);
+
+  // WebSocket — живые апдейты (для primary)
   useEffect(() => {
     if (!cfg) return;
     setHistory([]);
-    setEditing(false);
-    void api.getRelationship(cfg.slug)
-      .then(r => { setStage(r.stage); setScore(r.score); })
-      .catch(() => { /* silent */ });
-    void api.readMemoryFile(cfg.slug, "relationship.md")
-      .then(r => setNotes(r.content))
-      .catch(() => setNotes(""));
     const off = statusSocket(cfg.slug, (s) => {
       if (s.score) {
-        setScore(s.score);
         setHistory(prev => [...prev.slice(-119), { t: s.t, values: { ...s.score } }]);
+        // Обновляем score только если выбранный контакт — primary
+        const primaryContact = contacts.find(c => c.isPrimary);
+        if (!selectedId || selectedId === primaryContact?.fromId) {
+          setScore(s.score);
+        }
       }
     });
     return () => off();
-  }, [cfg?.slug]);
+  }, [cfg?.slug, contacts, selectedId]);
 
   const openEdit = () => {
     setEditVals({ ...(score ?? {}) });
@@ -53,8 +90,10 @@ export function RelationshipPage() {
     if (!cfg || !score) return;
     setSaving(true);
     try {
-      const r = await api.patchRelationship(cfg.slug, editVals);
+      const r = await api.patchRelationship(cfg.slug, editVals, selectedId ?? undefined);
       setScore(r.score);
+      // Обновляем в списке контактов
+      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score } : c));
       setEditing(false);
       toast("Очки сохранены", "success");
     } catch (e) {
@@ -67,10 +106,10 @@ export function RelationshipPage() {
   const bump = async (key: string, delta: number) => {
     if (!cfg || !score) return;
     const next = Math.max(0, Math.min(100, (score[key] ?? 0) + delta));
-    const patch = { [key]: next };
     try {
-      const r = await api.patchRelationship(cfg.slug, patch);
+      const r = await api.patchRelationship(cfg.slug, { [key]: next }, selectedId ?? undefined);
       setScore(r.score);
+      setContacts(prev => prev.map(c => c.fromId === selectedId ? { ...c, score: r.score } : c));
     } catch (e) {
       toast(`Ошибка: ${(e as Error)?.message}`, "error");
     }
@@ -80,11 +119,45 @@ export function RelationshipPage() {
     return <div className="empty"><div className="em-icon">♥</div><div className="em-title">Профиль не выбран</div><button className="btn primary" onClick={() => showSetupFlow(true)}>Создать</button></div>;
   }
 
+  const selectedContact = contacts.find(c => c.fromId === selectedId);
+
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 920 }}>
+
+      {/* Пикер контактов */}
+      {contacts.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <div className="h-title">Контакт</div>
+            <div className="h-meta">{contacts.length} чат{contacts.length > 1 ? "а" : ""}</div>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "4px 0" }}>
+            {contacts.map(c => (
+              <button
+                key={c.fromId}
+                className={`btn tiny${selectedId === c.fromId ? " primary" : ""}`}
+                onClick={() => setSelectedId(c.fromId)}
+                style={{ fontFamily: "var(--ga-font-mono)" }}
+              >
+                {c.isPrimary ? "★ " : ""}{c.fromId}
+                <span style={{ marginLeft: 6, opacity: 0.6, fontSize: 11 }}>{c.stage}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {contacts.length === 0 && (
+        <div className="card">
+          <div className="card-header"><div className="h-title">Контакты</div></div>
+          <div className="hint" style={{ marginTop: 8 }}>Нет per-contact данных — история появится после первых диалогов.</div>
+        </div>
+      )}
+
+      {/* Стадия */}
       <div className="card">
         <div className="card-header">
-          <div className="h-title">Стадия отношений</div>
+          <div className="h-title">Стадия{selectedContact ? ` — ${selectedContact.fromId}` : ""}</div>
           <div className="h-meta">
             {stage ? <span className="chip accent">{stage.num}. {stage.label}</span> : "—"}
           </div>
@@ -96,9 +169,10 @@ export function RelationshipPage() {
         </div>
       </div>
 
+      {/* Шкалы */}
       <div className="card">
         <div className="card-header">
-          <div className="h-title">Текущие шкалы</div>
+          <div className="h-title">Шкалы</div>
           <div className="h-actions">
             {!editing && score && (
               <button className="btn tiny" onClick={openEdit}>✏ Изменить</button>
@@ -145,21 +219,26 @@ export function RelationshipPage() {
             ))}
           </div>
         )}
+        {!score && <div className="hint" style={{ marginTop: 8 }}>Нет данных для этого контакта.</div>}
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <div className="h-title">История за сессию</div>
-          <div className="h-meta">снимки за {history.length} тиков</div>
+      {/* График только для primary */}
+      {(!selectedId || selectedContact?.isPrimary) && (
+        <div className="card">
+          <div className="card-header">
+            <div className="h-title">История за сессию</div>
+            <div className="h-meta">снимки за {history.length} тиков</div>
+          </div>
+          <Sparklines data={history} />
+          {history.length === 0 && <div className="hint" style={{ marginTop: 8 }}>Запусти runtime — он будет присылать снапшоты по WebSocket каждые 5 секунд.</div>}
         </div>
-        <Sparklines data={history} />
-        {history.length === 0 && <div className="hint" style={{ marginTop: 8 }}>Запусти runtime — он будет присылать снапшоты по WebSocket каждые 5 секунд.</div>}
-      </div>
+      )}
 
+      {/* relationship.md */}
       <div className="card">
         <div className="card-header">
           <div className="h-title">relationship.md</div>
-          <div className="h-meta">заметки и история (Markdown)</div>
+          <div className="h-meta">заметки и история</div>
         </div>
         <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderMarkdown(notes) || "<p style='color:var(--ga-text-faint)'>(пусто)</p>" }} />
       </div>

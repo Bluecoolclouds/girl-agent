@@ -191,11 +191,34 @@ export function registerProfileRoutes(r: Router): void {
     return { ok: true, text };
   });
 
-  r.get("/api/profiles/:slug/relationship", async ({ params }) => {
+  // Список контактов у которых есть per-contact relationship файл
+  r.get("/api/profiles/:slug/contacts", async ({ params }) => {
     const slug = params.slug ?? "";
     const cfg = await readConfig(slug);
     if (!cfg) throw new HttpError(404, "profile not found");
-    const rel = await readRelationship(slug, cfg.ownerId ?? undefined);
+    const contactsDir = path.join(profileDir(slug), "contacts");
+    const contacts: { fromId: number; stage: string; score: Record<string, number>; isPrimary: boolean }[] = [];
+    try {
+      const dirs = await fs.readdir(contactsDir, { withFileTypes: true });
+      for (const d of dirs) {
+        if (!d.isDirectory()) continue;
+        const fromId = Number(d.name);
+        if (!fromId) continue;
+        try {
+          const rel = await readRelationship(slug, fromId);
+          contacts.push({ fromId, stage: rel.stage, score: rel.score, isPrimary: fromId === cfg.ownerId });
+        } catch { /* skip unreadable */ }
+      }
+    } catch { /* no contacts dir */ }
+    return { contacts };
+  });
+
+  r.get("/api/profiles/:slug/relationship", async ({ params, query }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const fromId = query?.fromId ? Number(query.fromId) : (cfg.ownerId ?? undefined);
+    const rel = await readRelationship(slug, fromId);
     const stage = findStage(rel.stage);
     return { stage: { id: stage.id, num: stage.num, label: stage.label }, score: rel.score };
   });
