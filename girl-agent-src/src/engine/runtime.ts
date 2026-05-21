@@ -650,8 +650,14 @@ export class Runtime extends EventEmitter {
         recordInteractionMemory(this.llm, this.cfg, incomingText, undefined, m.fromId, "acquaintance").catch(() => {});
       }
 
-    if (m.media?.kind === "sticker" && m.media.fileId && isPrimary) {
-      void addStickerToLibrary(this.cfg, m.media.fileId, m.media.emoji ?? "", ["received"]);
+    if (m.media?.kind === "sticker") {
+      if (m.media.fileId) {
+        void addStickerToLibrary(this.cfg, m.media.fileId, m.media.emoji ?? "", ["received"]).then(() => {
+          this.emit("event", { type: "info", text: `sticker saved: ${m.media!.emoji ?? "?"} ${m.media!.fileId!.slice(0, 30)}…` } as RuntimeEvent);
+        });
+      } else {
+        this.emit("event", { type: "info", text: `sticker received but fileId missing — not saved` } as RuntimeEvent);
+      }
     }
 
     const requestedMedia = this.requestedOutgoingMedia(m.text);
