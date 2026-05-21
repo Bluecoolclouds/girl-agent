@@ -31,14 +31,25 @@ export function LogsPage() {
   const [activeDay, setActiveDay] = useState<string | null>(null);
   const [dayContent, setDayContent] = useState<string>("");
   const boxRef = useRef<HTMLDivElement>(null);
+  const seenKeysRef = useRef<Set<string>>(new Set());
 
   const active = profiles.find(p => p.slug === activeSlug) ?? null;
 
   useEffect(() => {
     if (!activeSlug) return;
+    seenKeysRef.current = new Set();
     setEvents([]);
-    api.getLogsBuffer(activeSlug).then(r => setEvents(r.events as LogEvent[])).catch(() => { /* silent */ });
-    const offLogs = logsSocket(activeSlug, (e) => setEvents(prev => prev.concat(e).slice(-1000)));
+    api.getLogsBuffer(activeSlug).then(r => {
+      const evs = r.events as LogEvent[];
+      evs.forEach(e => seenKeysRef.current.add(`${e.t}:${e.type}:${e.text ?? ""}`));
+      setEvents(evs);
+    }).catch(() => { /* silent */ });
+    const offLogs = logsSocket(activeSlug, (e) => {
+      const key = `${e.t}:${e.type}:${e.text ?? ""}`;
+      if (seenKeysRef.current.has(key)) return;
+      seenKeysRef.current.add(key);
+      setEvents(prev => prev.concat(e).slice(-1000));
+    });
     const offStatus = statusSocket(activeSlug, (s) => {
       setScore(s.score ?? null);
       setStage(s.stage);
