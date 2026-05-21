@@ -121,6 +121,8 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       // когда юзер удаляет сообщение, в raw update приходят только id, текст нужно
       // восстановить из хранимых буфера.
       const incomingCache = new Map<string, { text: string; ts: number; chatId: number | string; isPrivate: boolean; fromId: number; fromName?: string }>();
+      // Кэш известных реакций для дедупликации UpdateEditMessage (chatId:msgId → emoji)
+      const reactCache = new Map<string, string>();
       const cacheKey = (chatId: number | string, messageId: number): string => `${chatId}:${messageId}`;
       const trimIncomingCache = (): void => {
         if (incomingCache.size <= 256) return;
@@ -248,75 +250,86 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         } catch { /* keep update loop alive */ }
       }, new Raw({}));
 
-      // === Task #16: эмодзи-реакции юзера на её сообщения. UpdateMessageReactions приходит всем участникам. ===
-      client.addEventHandler(async (update: any) => {
-        try {
-          const cls = update?.className ?? update?.constructor?.name ?? "";
-          // diagnostic: log any reaction-related update class so we can see what GramJS actually delivers
-          if (/react/i.test(cls)) process.stderr.write(`[reaction-debug] Raw update: ${cls}\n`);
-          if (cls !== "UpdateMessageReactions") return;
-          const peer = update.peer;
-          const isPrivate = peer?.className === "PeerUser";
-          const chatId = isPrivate
-            ? Number(peer.userId?.value ?? peer.userId)
-            : Number(peer?.channelId?.value ?? peer?.chatId?.value ?? 0);
-          if (!chatId) return;
-          const messageId = Number(update.msgId);
-          const myId = Number((me?.id as any)?.value ?? me?.id ?? 0);
-          const reactions = (update.reactions?.recentReactions ?? []) as any[];
-          // Берём последнюю реакцию от партнёра (не от самой девушки).
-          let lastFromOther = reactions
-            .filter((r: any) => Number(r.peerId?.userId?.value ?? r.peerId?.userId ?? 0) !== myId)
-            .pop();
+      // === Task #16: эмодзи-реакции юзера на её сообщения ===
+      // Telegram доставляет реакции через UpdateEditMessage (message.reactions),
+      // UpdateMessageReactions поддерживается как запасной путь.
+      const handleReactionsObj = async (
+        reactionsObj: any,
+        chatId: number,
+        messageId: number,
+        isPrivate: boolean,
+        myId: number
+      ) => {
+        const rKey = cacheKey(chatId, messageId);
+        const recentReactions = (reactionsObj?.recentReactions ?? []) as any[];
+        const lastFromOther = recentReactions
+          .filter((r: any) => Number(r.peerId?.userId?.value ?? r.peerId?.userId ?? 0) !== myId)
+          .pop();
 
-          // Fallback: если recentReactions пустой (Telegram иногда не присылает его),
-          // но есть results с ненулевыми счётчиками — в приватном чате fromId === chatId.
-          if (!lastFromOther && isPrivate) {
-            const results = (update.reactions?.results ?? []) as any[];
-            const firstResult = results.find((r: any) => Number(r.count ?? 0) > 0);
-            if (firstResult) {
-              const emoji = firstResult.reaction?.emoticon as string | undefined;
-              if (emoji) {
-                await onMessage({
-                  text: "",
-                  fromId: chatId,
-                  chatId,
-                  messageId,
-                  isPrivate,
-                  emojiReaction: { emoji, targetMessageId: messageId, removed: false }
-                }).catch(() => {});
-              }
-              return;
-            }
-            // results пустой → все реакции сняты
+        if (!lastFromOther) {
+          // Fallback: смотрим results (Telegram не всегда шлёт recentReactions)
+          const results = (reactionsObj?.results ?? []) as any[];
+          const firstResult = results.find((r: any) => Number(r.count ?? 0) > 0);
+          if (firstResult) {
+            const emoji = firstResult.reaction?.emoticon as string | undefined;
+            if (!emoji || reactCache.get(rKey) === emoji) return;
+            reactCache.set(rKey, emoji);
             await onMessage({
-              text: "",
-              fromId: chatId,
-              chatId,
-              messageId,
-              isPrivate,
-              emojiReaction: { emoji: "", targetMessageId: messageId, removed: true }
+              text: "", fromId: chatId, chatId, messageId, isPrivate,
+              emojiReaction: { emoji, targetMessageId: messageId, removed: false }
             }).catch(() => {});
             return;
           }
+          // Пустые results → реакции сняты
+          if (reactCache.has(rKey)) {
+            reactCache.delete(rKey);
+            await onMessage({
+              text: "", fromId: chatId, chatId, messageId, isPrivate,
+              emojiReaction: { emoji: "", targetMessageId: messageId, removed: true }
+            }).catch(() => {});
+          }
+          return;
+        }
 
-          if (!lastFromOther) return;
-          const emoji = lastFromOther.reaction?.emoticon as string | undefined;
-          const removed = !emoji;
-          const fromId = Number(lastFromOther.peerId?.userId?.value ?? lastFromOther.peerId?.userId ?? 0);
-          if (!emoji && !removed) return;
-          await onMessage({
-            text: "",
-            fromId,
-            chatId,
-            messageId,
-            isPrivate,
-            emojiReaction: {
-              emoji: emoji ?? "",
-              targetMessageId: messageId,
-              removed
-            }
-          }).catch(() => {});
+        const emoji = lastFromOther.reaction?.emoticon as string | undefined;
+        if (!emoji) return;
+        if (reactCache.get(rKey) === emoji) return; // дедупликация
+        reactCache.set(rKey, emoji);
+        const fromId = Number(lastFromOther.peerId?.userId?.value ?? lastFromOther.peerId?.userId ?? 0) || chatId;
+        await onMessage({
+          text: "", fromId, chatId, messageId, isPrivate,
+          emojiReaction: { emoji, targetMessageId: messageId, removed: false }
+        }).catch(() => {});
+      };
+
+      client.addEventHandler(async (update: any) => {
+        try {
+          const cls = update?.className ?? update?.constructor?.name ?? "";
+
+          // --- Основной путь: UpdateEditMessage с полем reactions ---
+          if (cls === "UpdateEditMessage") {
+            const msg = update.message;
+            if (!msg?.reactions) return;
+            const peer = msg.peerId;
+            if (peer?.className !== "PeerUser") return;
+            const chatId = Number(peer.userId?.value ?? peer.userId);
+            if (!chatId) return;
+            const myId = Number((me?.id as any)?.value ?? me?.id ?? 0);
+            await handleReactionsObj(msg.reactions, chatId, Number(msg.id), true, myId);
+            return;
+          }
+
+          // --- Запасной путь: UpdateMessageReactions (если Telegram вдруг пришлёт) ---
+          if (cls === "UpdateMessageReactions") {
+            const peer = update.peer;
+            const isPrivate = peer?.className === "PeerUser";
+            const chatId = isPrivate
+              ? Number(peer.userId?.value ?? peer.userId)
+              : Number(peer?.channelId?.value ?? peer?.chatId?.value ?? 0);
+            if (!chatId) return;
+            const myId = Number((me?.id as any)?.value ?? me?.id ?? 0);
+            await handleReactionsObj(update.reactions, chatId, Number(update.msgId), isPrivate, myId);
+          }
         } catch { /* keep update loop alive */ }
       }, new Raw({}));
     },
