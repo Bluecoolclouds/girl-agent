@@ -945,7 +945,13 @@ export class Runtime extends EventEmitter {
     const replyToMessageId = replyTo && incoming?.messageId ? incoming.messageId : undefined;
     const bubbles = dedupeBubbles(smartSplitBubbles(cleanedReply, tick.bubbles || 1)).slice(0, Math.max(tick.bubbles || 1, 1));
     const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing, replyToMessageId);
-    this.setDecisionStatus(this.histKey(chatId), sent.length ? "sent" : "fallback", sent.length ? undefined : "все пузыри были пустыми/дублями");
+    if (!sent.length) {
+      // Все пузыри были дублями — не молчим, отправляем нейтральный филлер.
+      this.emit("event", { type: "info", text: "все пузыри — дубли, отправляю нейтральный филлер", chatId } as RuntimeEvent);
+      await this.sendNeutralFiller(chatId, hist, scope, tick.typing);
+      return;
+    }
+    this.setDecisionStatus(this.histKey(chatId), "sent");
     if (scope === "primary") {
       recordInteractionMemory(this.llm, this.cfg, lastUser ?? "", sent.join(" / "), typeof chatId === "number" ? chatId : undefined, "primary").catch(() => {});
     }
@@ -1845,7 +1851,8 @@ function bubbleIsContainedIn(shorter: string, longer: string): boolean {
 function isDuplicateAssistantBubble(hist: ConversationTurn[], text: string): boolean {
   const normalized = normalizeForDuplicate(text);
   if (!normalized) return true;
-  const recent = hist.slice(-8).filter(t => t.role === "assistant");
+  // Проверяем только последние 3 ассистент-сообщения: дальше — не повтор, а новый контекст.
+  const recent = hist.filter(t => t.role === "assistant").slice(-3);
   return recent.some(t => {
     const histNorm = normalizeForDuplicate(t.content);
     if (histNorm === normalized) return true;
