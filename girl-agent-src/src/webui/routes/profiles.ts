@@ -201,10 +201,13 @@ export function registerProfileRoutes(r: Router): void {
     const contacts: { fromId: number; stage: string; score: Record<string, number>; isPrimary: boolean }[] = [];
     try {
       const dirs = await fs.readdir(contactsDir, { withFileTypes: true });
+      // Системные ID Telegram (службы, каналы, сервисные номера)
+      const TG_SERVICE_IDS = new Set([777000, 42777, 4244000]);
       for (const d of dirs) {
         if (!d.isDirectory()) continue;
         const fromId = Number(d.name);
         if (!fromId) continue;
+        if (TG_SERVICE_IDS.has(fromId)) continue;
         try {
           const rel = await readRelationship(slug, fromId);
           contacts.push({ fromId, stage: rel.stage, score: rel.score, isPrimary: fromId === cfg.ownerId });
