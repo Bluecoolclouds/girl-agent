@@ -26,6 +26,7 @@ import { describeIncomingMedia, imagePartFromMedia, memeDetectionInstruction } f
 import { isQuotaExhaustedError, looksLikeJailbreak, sanitizeModelReply, silentErrorLabel } from "./security.js";
 import { addStickerToLibrary, pickSticker } from "./stickers.js";
 import { pickPhoto, pickPhotoByTag, listPhotoTags, markPhotoSent } from "./photos.js";
+import { scanChannelPhotos } from "./channel-scan.js";
 import { EventEmitter } from "node:events";
 import { applyLLMUpdate, describeLLM } from "../config/llm-update.js";
 import { injectTypos, pickTypoIntensity } from "./typos.js";
@@ -128,6 +129,18 @@ export class Runtime extends EventEmitter {
 
     // Пред-загружаем daily-life (в фоне, не блокируем старт)
     this.refreshDailyLife().catch(() => {});
+
+    // Сканируем канал и обновляем photos/index.md (в фоне)
+    if (this.cfg.photoChannelId && this.cfg.mode === "userbot") {
+      scanChannelPhotos(this.cfg, this.tg).then(({ added, skipped }) => {
+        if (added > 0) {
+          this.emit("event", { type: "info", text: `channel-scan: добавлено ${added} фото/видео в index.md (пропущено дублей: ${skipped})` } as RuntimeEvent);
+        }
+      }).catch((e: unknown) => {
+        const msg = (e instanceof Error) ? e.message : String(e);
+        this.emit("event", { type: "info", text: `channel-scan: не удалось — ${msg.slice(0, 120)}` } as RuntimeEvent);
+      });
+    }
 
     // запускаем agenda-scheduler (раз в 60с проверяет due items)
     this.agendaTimer = setInterval(() => this.tickAgenda().catch(e =>

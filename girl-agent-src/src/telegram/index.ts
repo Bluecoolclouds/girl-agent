@@ -80,6 +80,8 @@ export interface TgAdapter {
   deleteMessages?(chatId: number | string, messageIds: number[], revoke?: boolean): Promise<void>;
   /** Возвращает информацию о самом боте/юзерботе: username и отображаемое имя в ТГ. */
   getSelf?(): { username?: string; displayName?: string };
+  /** Итерирует сообщения с медиа из канала — для автосканирования photos/index.md. */
+  iterChannelMedia?(channelId: string, limit: number): AsyncIterable<{ id: number; type: "photo" | "video"; caption: string }>;
   stop(): Promise<void>;
 }
 

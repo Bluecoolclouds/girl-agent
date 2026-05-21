@@ -444,6 +444,28 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         displayName: parts.join(" ") || undefined
       };
     },
+    async *iterChannelMedia(channelId: string, limit: number) {
+      // Ищем канал перебором диалогов (нужна access hash из кэша)
+      const targetId = Math.abs(Number(String(channelId).replace(/^-100/, "")));
+      let foundEntity: any = null;
+      for await (const dialog of client.iterDialogs({ limit: 500 })) {
+        const id = Number((dialog.entity as any)?.id ?? 0);
+        if (id === targetId) { foundEntity = dialog.entity; break; }
+      }
+      if (!foundEntity) throw new Error(`канал ${channelId} не найден в диалогах — убедись что аккаунт состоит в канале`);
+      for await (const msg of client.iterMessages(foundEntity, { limit })) {
+        const m = msg as Api.Message;
+        if (!m.media) continue;
+        const hasPhoto = m.media instanceof Api.MessageMediaPhoto;
+        const hasVideo =
+          m.media instanceof Api.MessageMediaDocument &&
+          m.media.document instanceof Api.Document &&
+          (m.media.document as Api.Document).mimeType?.startsWith("video/");
+        if (!hasPhoto && !hasVideo) continue;
+        const caption = (m.message ?? "").replace(/\|/g, "—").replace(/\r?\n/g, " ").trim();
+        yield { id: m.id, type: (hasVideo ? "video" : "photo") as "photo" | "video", caption };
+      }
+    },
     async stop() {
       await client.disconnect();
     }
