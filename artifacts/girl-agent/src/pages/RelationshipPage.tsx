@@ -31,6 +31,18 @@ export function RelationshipPage() {
   const [editVals, setEditVals] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
 
+  const loadContacts = (slug: string, keepSelected = false) => {
+    void api.listContacts(slug)
+      .then(r => {
+        setContacts(r.contacts);
+        if (!keepSelected) {
+          const primary = r.contacts.find(c => c.isPrimary) ?? r.contacts[0];
+          if (primary) setSelectedId(primary.fromId);
+        }
+      })
+      .catch(() => {});
+  };
+
   // Загрузка списка контактов при смене профиля
   useEffect(() => {
     if (!cfg) return;
@@ -40,14 +52,7 @@ export function RelationshipPage() {
     setScore(null);
     setHistory([]);
     setEditing(false);
-    void api.listContacts(cfg.slug)
-      .then(r => {
-        setContacts(r.contacts);
-        // Выбираем primary по умолчанию, иначе первый
-        const primary = r.contacts.find(c => c.isPrimary) ?? r.contacts[0];
-        if (primary) setSelectedId(primary.fromId);
-      })
-      .catch(() => {});
+    loadContacts(cfg.slug);
   }, [cfg?.slug]);
 
   // Загрузка данных при смене выбранного контакта
@@ -78,6 +83,8 @@ export function RelationshipPage() {
         if (!selectedId || selectedId === primaryContact?.fromId) {
           setScore(s.score);
         }
+        // Перезагружаем список контактов — мог появиться новый
+        loadContacts(cfg.slug, true);
       }
     });
     return () => off();
@@ -155,6 +162,7 @@ export function RelationshipPage() {
                 onChange={e => { setContactSearch(e.target.value); setContactLimit(50); }}
                 style={{ width: 140, fontFamily: "var(--ga-font-mono)", fontSize: 13, padding: "3px 8px" }}
               />
+              <button className="btn tiny" onClick={() => cfg && loadContacts(cfg.slug, true)}>↻</button>
             </div>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "4px 0" }}>
@@ -187,7 +195,12 @@ export function RelationshipPage() {
 
       {contacts.length === 0 && (
         <div className="card">
-          <div className="card-header"><div className="h-title">Контакты</div></div>
+          <div className="card-header">
+            <div className="h-title">Контакты</div>
+            <div className="h-actions">
+              <button className="btn tiny" onClick={() => cfg && loadContacts(cfg.slug)}>Обновить</button>
+            </div>
+          </div>
           <div className="hint" style={{ marginTop: 8 }}>Нет per-contact данных — история появится после первых диалогов.</div>
         </div>
       )}

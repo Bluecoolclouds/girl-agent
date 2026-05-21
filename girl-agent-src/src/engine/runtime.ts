@@ -849,6 +849,22 @@ export class Runtime extends EventEmitter {
       if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
         await this.tg.readHistory?.(m.chatId).catch(() => {});
       }
+      // ❤ при прочтении без ответа — на тёплых стадиях (если behaviorTick не вернул реакцию)
+      if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
+        const heartChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.35
+          : this.cfg.stage === "dating-early" ? 0.25
+          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.12
+          : 0;
+        if (heartChance > 0 && Math.random() < heartChance) {
+          const target = this.pickReactionTarget(key, m.messageId);
+          const delay = 3_000 + Math.random() * 8_000;
+          setTimeout(async () => {
+            await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
+            this.emit("event", { type: "info", text: `❤ (read-react, без ответа)` } as RuntimeEvent);
+            appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ read-react`, m.fromId).catch(() => {});
+          }, delay).unref?.();
+        }
+      }
       this.emit("event", { type: "ignored", text: incomingText, reason: tick.ignoreReason ?? tick.intent } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ignored (${tick.intent}: ${tick.ignoreReason ?? ""})`, m.fromId);
       recordInteractionMemory(this.llm, this.cfg, incomingText, undefined, m.fromId, "primary").catch(() => {});
