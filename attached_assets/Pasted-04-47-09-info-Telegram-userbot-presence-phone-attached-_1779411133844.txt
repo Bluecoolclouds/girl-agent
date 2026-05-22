@@ -1,0 +1,72 @@
+04:47:09
+[info]
+Telegram userbot запущен. Профиль: кристина | presence: phone-attached | communication: Милая
+04:47:09
+[info]
+channel-scan: добавлено 0 фото/видео в index.md (пропущено дублей: 2)
+04:47:34
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+04:49:46
+[incoming]
+М
+04:49:46
+[score]
+{"type":"score","score":{"interest":20,"trust":23,"attraction":0,"annoyance":0,"cringe":0},"t":1779410986157}
+04:49:49
+[incoming]
+Хочу все таки купить твои фотки
+04:49:49
+[score]
+{"type":"score","score":{"interest":20,"trust":23,"attraction":0,"annoyance":0,"cringe":0},"t":1779410989941}
+04:49:56
+[score]
+{"type":"score","score":{"interest":20,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779410996182}
+04:50:02
+[score]
+{"type":"score","score":{"interest":24,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411002891}
+04:50:07
+[outgoing]
+окей)
+04:50:15
+[incoming]
+Кидай
+04:50:15
+[score]
+{"type":"score","score":{"interest":24,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411015296}
+04:50:15
+[outgoing]
+вот ссылка — https://t.me/+sVWd7I_sV4xmM2Qx там всё есть
+04:50:19
+[score]
+{"type":"score","score":{"interest":28,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411019717}
+04:50:22
+[incoming]
+Кидай
+04:50:22
+[score]
+{"type":"score","score":{"interest":28,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411022262}
+04:50:32
+[incoming]
+Фото скинь
+04:50:32
+[score]
+{"type":"score","score":{"interest":28,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411032076}
+04:50:35
+[incoming]
+За звезды
+04:50:35
+[score]
+{"type":"score","score":{"interest":28,"trust":23,"attraction":0,"annoyance":1,"cringe":0},"t":1779411035189}
+04:50:40
+[score]
+{"type":"score","score":{"interest":32,"trust":23,"attraction":0,"annoyance":2,"cringe":0},"t":1779411040458}
+04:50:44
+[outgoing]
+там берется через канал https://t.me/+sVWd7I_sV4xmM2Qx
+04:50:51
+[score]
+{"type":"score","score":{"interest":34,"trust":23,"attraction":0,"annoyance":3,"cringe":0},"t":1779411051591}
+04:50:59
+[score]
+{"type":"score","score":{"interest":38,"trust":24,"attraction":0,"annoyance":3,"cringe":0},"t":1779411059546}

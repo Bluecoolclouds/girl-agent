@@ -75,43 +75,50 @@ async function photosDir(cfg: ProfileConfig): Promise<string> {
 
 export async function listPhotos(cfg: ProfileConfig): Promise<PhotoEntry[]> {
   await photosDir(cfg);
-  const indexPath = path.join(profileDir(cfg.slug), INDEX_FILE);
-  let raw = "";
-  try { raw = await fs.readFile(indexPath, "utf8"); } catch { return []; }
-
   const dir = path.join(profileDir(cfg.slug), PHOTOS_DIR);
   const entries: PhotoEntry[] = [];
 
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const [source = "", tagsRaw = "", caption] = trimmed.split("|").map(x => x.trim());
-    if (!source) continue;
+  // Читаем index.md (локальные файлы) и channel.md (платные Stars-посты из канала)
+  const filesToRead = [
+    path.join(profileDir(cfg.slug), INDEX_FILE),
+    path.join(profileDir(cfg.slug), CHANNEL_INDEX_FILE),
+  ];
 
-    // Канальная запись: чистое целое число = ID сообщения
-    const msgId = /^\d+$/.test(source) ? parseInt(source, 10) : NaN;
-    if (!isNaN(msgId)) {
+  for (const filePath of filesToRead) {
+    let raw = "";
+    try { raw = await fs.readFile(filePath, "utf8"); } catch { continue; }
+
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const [source = "", tagsRaw = "", caption] = trimmed.split("|").map(x => x.trim());
+      if (!source) continue;
+
+      // Канальная запись: чистое целое число = ID сообщения в канале
+      const msgId = /^\d+$/.test(source) ? parseInt(source, 10) : NaN;
+      if (!isNaN(msgId)) {
+        entries.push({
+          filePath: "",
+          channelMsgId: msgId,
+          tags: tagsRaw ? tagsRaw.split(",").map(x => x.trim()).filter(Boolean) : [],
+          caption: caption || undefined,
+        });
+        continue;
+      }
+
+      // Локальный файл
+      const localPath = path.join(dir, source);
+      try {
+        await fs.access(localPath);
+      } catch {
+        continue;
+      }
       entries.push({
-        filePath: "",
-        channelMsgId: msgId,
+        filePath: localPath,
         tags: tagsRaw ? tagsRaw.split(",").map(x => x.trim()).filter(Boolean) : [],
         caption: caption || undefined,
       });
-      continue;
     }
-
-    // Локальный файл
-    const filePath = path.join(dir, source);
-    try {
-      await fs.access(filePath);
-    } catch {
-      continue;
-    }
-    entries.push({
-      filePath,
-      tags: tagsRaw ? tagsRaw.split(",").map(x => x.trim()).filter(Boolean) : [],
-      caption: caption || undefined,
-    });
   }
   return entries;
 }
