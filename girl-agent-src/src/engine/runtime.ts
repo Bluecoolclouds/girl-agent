@@ -1379,7 +1379,42 @@ export class Runtime extends EventEmitter {
   async cmdWhy(chatId?: string): Promise<string> {
     if (this.paused) return "⏸ агент на паузе — :resume чтобы продолжить";
 
-    const target = chatId ? this.resolveChatRef(chatId) : this.cfg.ownerId;
+    // :why all — краткий обзор всех чатов с активными решениями
+    if (chatId === "all") {
+      if (this.lastDecision.size === 0) return "нет сохранённых решений в текущем запуске";
+      const now = Date.now();
+      const lines: string[] = ["📋 Все активные чаты (последние решения):"];
+      const sorted = [...this.lastDecision.entries()].sort((a, b) => b[1].at - a[1].at);
+      for (const [k, d] of sorted) {
+        const ageSec = Math.max(0, Math.round((now - d.at) / 1000));
+        const pending = this.pendingReplyDueAt.get(k);
+        const timer = pending && pending > now ? ` ⏱ через ${Math.ceil((pending - now) / 1000)}с` : "";
+        lines.push(`  ${k}: ${d.status} / ${d.intent} / reply=${d.shouldReply ? "да" : "нет"} (${ageSec}с назад)${timer}`);
+      }
+      return lines.join("\n");
+    }
+
+    // Без аргумента — берём самый последний активный чат из lastDecision вместо ownerId
+    let resolvedTarget: number | string | undefined;
+    if (chatId) {
+      resolvedTarget = this.resolveChatRef(chatId);
+    } else if (this.lastDecision.size > 0) {
+      // Найти ключ с наибольшим at (самый свежий)
+      let latestKey: string | undefined;
+      let latestAt = 0;
+      for (const [k, d] of this.lastDecision.entries()) {
+        if (d.at > latestAt) { latestAt = d.at; latestKey = k; }
+      }
+      // Извлечь chatId из histKey (формат: "slug:chatId" или "chatId")
+      if (latestKey) {
+        const parts = latestKey.split(":");
+        resolvedTarget = parts[parts.length - 1];
+      }
+    } else {
+      resolvedTarget = this.cfg.ownerId;
+    }
+
+    const target = resolvedTarget;
     const key = target !== undefined ? this.histKey(target) : this.histKey("default");
     const targetFromId = target !== undefined ? Number(target) : this.cfg.ownerId;
     const rel = await readRelationship(this.cfg.slug, targetFromId ?? undefined);
