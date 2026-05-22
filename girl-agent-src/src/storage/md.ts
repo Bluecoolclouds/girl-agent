@@ -266,20 +266,24 @@ export async function appendSharedMemory(slug: string, tz: string, fromId: numbe
   const day = sessionDate(tz);
   const safe = text.replace(/\s+/g, " ").trim();
   if (!safe) return;
-  const line = `- ${new Date().toISOString()} user:${fromId} day:${day}: ${safe}`;
-  const raw = await readMd(slug, "memory/shared-cross-chat.md");
+  const line = `- ${new Date().toISOString()} day:${day}: ${safe}`;
+  // Per-user file — изолировано по контакту, не зависит от объёма других чатов
+  const filePath = `contacts/${fromId}/cross-chat.md`;
+  const raw = await readMd(slug, filePath);
   const lines = raw.split(/\r?\n/).filter(Boolean);
   if (lines.slice(-20).some(existing => existing.endsWith(`: ${safe}`))) return;
-  await writeMd(slug, "memory/shared-cross-chat.md", [...lines.slice(-500), line].join("\n") + "\n");
+  await writeMd(slug, filePath, [...lines.slice(-200), line].join("\n") + "\n");
 }
 
-export async function readSharedMemory(slug: string, limit = 40): Promise<string> {
-  const raw = await readMd(slug, "memory/shared-cross-chat.md");
+export async function readSharedMemory(slug: string, limit = 40, fromId?: number): Promise<string> {
+  const filePath = fromId ? `contacts/${fromId}/cross-chat.md` : "memory/shared-cross-chat.md";
+  const raw = await readMd(slug, filePath);
   return raw.split(/\r?\n/).filter(Boolean).slice(-limit).join("\n");
 }
 
-export async function searchSharedMemory(slug: string, query: string, limit = 8): Promise<string> {
-  const raw = await readMd(slug, "memory/shared-cross-chat.md");
+export async function searchSharedMemory(slug: string, query: string, limit = 8, fromId?: number): Promise<string> {
+  const filePath = fromId ? `contacts/${fromId}/cross-chat.md` : "memory/shared-cross-chat.md";
+  const raw = await readMd(slug, filePath);
   const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length >= 3);
   const lines = raw.split(/\r?\n/).filter(Boolean);
   const hits = tokens.length

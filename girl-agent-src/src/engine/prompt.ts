@@ -267,7 +267,7 @@ export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx 
     : relRaw;
   const longTerm = isAcquaintance ? "" : await readMd(cfg.slug, "memory/long-term.md");
   const sharedMemory = isAcquaintance
-    ? await readSharedMemory(cfg.slug, 8)
+    ? await readSharedMemory(cfg.slug, 8, ctx.fromId)
     : ctx.incoming ? await searchSharedMemory(cfg.slug, ctx.incoming, 12) : await readSharedMemory(cfg.slug, 20);
   const stage = findStage(effectiveStageId);
   const seed = [...cfg.name].reduce((a, c) => a + c.charCodeAt(0), 0);
