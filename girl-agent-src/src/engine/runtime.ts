@@ -722,7 +722,25 @@ export class Runtime extends EventEmitter {
         await writeRelationship(this.cfg.slug, { ...updatedRel, score: newScore, stage: this.cfg.stage }, m.fromId);
         this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
       }
-      // acquaintance-react отключён
+      // Реакция для acquaintance — ставим в то же окно что и ответ (readHistory уже в sendBubbles)
+      if (this.cfg.mode === "userbot") {
+        const reactChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
+          : this.cfg.stage === "dating-early" ? 0.5
+          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.45
+          : 0.35;
+        if (Math.random() < reactChance) {
+          const target = this.pickReactionTarget(key, m.messageId);
+          const reactDelay = Math.max(2_000, tick.delaySec * 1000 * 0.4 + Math.random() * 3_000);
+          setTimeout(async () => {
+            if (this.userbotActionAvailable("readHistory")) {
+              await this.tg.readHistory?.(m.chatId).catch(() => {});
+            }
+            await this.tg.setReaction(m.chatId, target.messageId, "❤").catch(() => {});
+            this.emit("event", { type: "info", text: `❤ (acquaintance-react)` } as RuntimeEvent);
+            appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ❤ acquaintance-react`, m.fromId).catch(() => {});
+          }, reactDelay).unref?.();
+        }
+      }
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
     }
