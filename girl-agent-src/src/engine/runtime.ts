@@ -128,7 +128,10 @@ export class Runtime extends EventEmitter {
     this.lastStage = this.cfg.stage;
 
     // Пред-загружаем daily-life (в фоне, не блокируем старт)
-    this.refreshDailyLife().catch(() => {});
+    this.refreshDailyLife().catch((e: unknown) => {
+      const msg = (e instanceof Error) ? e.message : String(e);
+      this.emit("event", { type: "error", text: `refreshDailyLife: ${msg}` } as RuntimeEvent);
+    });
 
     // Сканируем канал и обновляем photos/index.md (в фоне)
     if (this.cfg.photoChannelId && this.cfg.mode === "userbot") {
