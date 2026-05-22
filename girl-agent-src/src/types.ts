@@ -153,6 +153,8 @@ export interface ProfileConfig {
   busySchedule?: BusySlot[];
   /** ID или @username канала-источника фото. Из него бот пересылает по message_id. */
   photoChannelId?: string;
+  /** Пригласительная ссылка на закрытый канал с платным контентом (https://t.me/+...) */
+  photoChannelLink?: string;
 }
 
 export interface RelationshipScore {

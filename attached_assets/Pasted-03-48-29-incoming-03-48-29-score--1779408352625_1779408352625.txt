@@ -1,0 +1,88 @@
+03:48:29
+[incoming]
+Кристин ну скинь что-то красивое если ты понимаешь о чем я
+03:48:29
+[score]
+{"type":"score","score":{"interest":-14,"trust":-16,"attraction":-14,"annoyance":14,"cringe":14},"t":1779407309581}
+03:48:42
+[score]
+{"type":"score","score":{"interest":-18,"trust":-21,"attraction":-18,"annoyance":18,"cringe":19},"t":1779407322049}
+03:50:29
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+03:51:50
+[outgoing]
+понимаю
+но не с первых двух сообщений же)
+03:53:50
+[incoming]
+Но я уже знаю что ты продаешь контент так что не медли а то уйду)
+03:53:50
+[score]
+{"type":"score","score":{"interest":-18,"trust":-21,"attraction":-18,"annoyance":18,"cringe":19},"t":1779407630898}
+03:53:56
+[incoming]
+Я готов купить!!
+03:53:56
+[score]
+{"type":"score","score":{"interest":-18,"trust":-21,"attraction":-18,"annoyance":18,"cringe":19},"t":1779407636938}
+03:53:58
+[score]
+{"type":"score","score":{"interest":-22,"trust":-26,"attraction":-22,"annoyance":24,"cringe":24},"t":1779407638630}
+03:54:04
+[score]
+{"type":"score","score":{"interest":-25,"trust":-30,"attraction":-25,"annoyance":28,"cringe":27},"t":1779407644028}
+03:56:12
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+03:59:01
+[incoming]
+[он прислал стикер 🌟]
+03:59:01
+[score]
+{"type":"score","score":{"interest":-11,"trust":-9,"attraction":-9,"annoyance":24,"cringe":12},"t":1779407941722}
+03:59:01
+[info]
+sticker saved: 🌟 gramjs:5260705548797494221:327…
+03:59:02
+[incoming]
+[он прислал стикер 😍]
+03:59:02
+[score]
+{"type":"score","score":{"interest":-11,"trust":-9,"attraction":-9,"annoyance":24,"cringe":12},"t":1779407942878}
+03:59:02
+[info]
+sticker saved: 😍 gramjs:5258026099090147390:-87…
+03:59:03
+[incoming]
+[он прислал стикер 🤨]
+03:59:03
+[score]
+{"type":"score","score":{"interest":-11,"trust":-9,"attraction":-9,"annoyance":24,"cringe":12},"t":1779407943186}
+03:59:03
+[info]
+sticker saved: 🤨 gramjs:5260627290198394736:706…
+03:59:08
+[score]
+{"type":"score","score":{"interest":-12,"trust":-9,"attraction":-9,"annoyance":26,"cringe":13},"t":1779407948219}
+03:59:15
+[score]
+{"type":"score","score":{"interest":-14,"trust":-9,"attraction":-10,"annoyance":29,"cringe":15},"t":1779407955195}
+03:59:22
+[score]
+{"type":"score","score":{"interest":-16,"trust":-9,"attraction":-11,"annoyance":33,"cringe":17},"t":1779407962816}
+04:01:11
+[info]
+daily-life regenerated due to stage change: tg-given-cold → tg-given-cold
+04:01:57
+[info]
+❤ (acquaintance-react)
+04:04:52
+[info]
+retry-reply-brief succeeded после пустого первого ответа
+04:04:52
+[outgoing]
+не дави, егор)
+04:05:43
+[outgoing]
+пхпх странный набор у тебя
