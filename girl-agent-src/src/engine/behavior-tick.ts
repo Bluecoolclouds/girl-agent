@@ -198,22 +198,26 @@ export async function behaviorTick(
       };
     }
     // Иначе ответ — но короткий и медленный
-    const parsed = await llm.chat(
-      [{ role: "system", content: SYS }, { role: "user", content: TEMPLATE(state, history, incoming, ctx, reactionsHint) }],
-      { temperature: 0.7, maxTokens: 3500, json: true }
-    );
-    const result = JSON.parse(parsed);
-    return {
-      shouldReply: true,
-      shouldRead: true,
-      delaySec: clamp(result.delaySec ?? 20, 10, 120),
-      bubbles: 1,
-      typing: result.typing ?? true,
-      ignoreReason: undefined,
-      moodDelta: result.moodDelta || { annoyance: 3 },
-      intent: "short",
-      reaction: undefined
-    };
+    try {
+      const parsed = await llm.chat(
+        [{ role: "system", content: SYS }, { role: "user", content: TEMPLATE(state, history, incoming, ctx, reactionsHint) }],
+        { temperature: 0.7, maxTokens: 3500, json: true }
+      );
+      const result = JSON.parse(parsed);
+      return {
+        shouldReply: true,
+        shouldRead: true,
+        delaySec: clamp(result.delaySec ?? 20, 10, 120),
+        bubbles: 1,
+        typing: result.typing ?? true,
+        ignoreReason: undefined,
+        moodDelta: result.moodDelta || { annoyance: 3 },
+        intent: "short",
+        reaction: undefined
+      };
+    } catch {
+      return { shouldReply: true, shouldRead: true, delaySec: 20, bubbles: 1, typing: true, ignoreReason: undefined, moodDelta: { annoyance: 3 }, intent: "short" };
+    }
   }
 
   try {
@@ -334,7 +338,7 @@ function canRecoverReply(stage: string, score: { interest: number; attraction: n
   if (ctx.conflictColdActive) return false;
   if (ctx.presence?.asleep && !ctx.presence.nightAwake) return false;
   if (score.annoyance > 65) return false;
-  if (stage === "tg-given-cold" && score.interest < 20 && score.attraction < 20) return false;
+  if (stage === "tg-given-cold" && score.interest < 20 && score.attraction < 20 && !ctx.isAcquaintance) return false;
   return true;
 }
 
