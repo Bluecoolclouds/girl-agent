@@ -805,7 +805,8 @@ export class Runtime extends EventEmitter {
     if (recentEmojiReaction) this.lastEmojiReactionByKey.delete(key); // один раз
     const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, {
       presence, conflict, conflictColdActive: coldActive, blockHint, activeDialog, recentIncomingIds,
-      fromId: m.fromId, recentEmojiReaction
+      fromId: m.fromId, recentEmojiReaction,
+      isAcquaintance: !isPrimary
     });
     if (this.incomingSeq.get(key) !== seq) return;
     const baseDecision: DecisionSnapshot = {

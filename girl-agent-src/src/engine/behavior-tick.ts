@@ -20,6 +20,8 @@ interface BehaviorContext {
   fromId?: number;
   /** Недавняя эмодзи-реакция от него (< 5 мин) — он поставил реакцию, а теперь пишет текст. */
   recentEmojiReaction?: { emoji: string; herMessageSnippet?: string };
+  /** Это потенциальный подписчик/покупатель (acquaintance scope), а не основной парень. */
+  isAcquaintance?: boolean;
 }
 
 function reactionMenu(stage: string, score: { attraction: number; interest: number; annoyance: number; cringe: number }): string {
@@ -105,7 +107,13 @@ ${ctx.recentIncomingIds?.length ? reactionsHint + "\n" + formatIncomingIds(ctx.r
 - Если милое/уместное на тёплой стадии — interest и attraction +.
 - Длинная простыня от него — bubbles её ответа НЕ становится больше; скорее наоборот.
 - ВАЖНО: если он явно говорит что готов платить / купить контент ("я готов купить", "куплю", "хочу купить", "сколько стоит", "как купить", "готов платить") — это КОММЕРЧЕСКИЙ сигнал, не давление. annoyance НЕ растёт, cringe НЕ растёт. interest +3..+6, attraction без изменений или +1..+3.
-- moodDelta: маленькие числа -10..+10.${ctx.recentIncomingIds?.length ? `
+- moodDelta: маленькие числа -10..+10.${ctx.isAcquaintance ? `
+- РЕЖИМ ПОДПИСЧИКА (acquaintance): Это потенциальный покупатель контента, не случайный незнакомец. Его целевая аудитория — именно такие парни. Правила скоринга отличаются:
+  • Сексуальный opener в первых 1-3 сообщениях ("покажи тело", "скинь фото", намёки на секс) — это НОРМА для этой аудитории. МАКСИМАЛЬНЫЙ штраф: annoyance +2, cringe +2. НЕ даёт -10 и не даёт -15.
+  • Флирт, комплименты, заигрывание — annoyance НЕ растёт, interest +1..+3.
+  • Обычные нейтральные сообщения (имя, вопрос, "привет") — interest +2..+4, trust +2..+4.
+  • МАКСИМАЛЬНЫЙ штраф за ЛЮБОЕ одно сообщение: annoyance +5, cringe +5. Не больше.
+  • Реальный кринж (агрессия, угрозы, требование бесплатного, хамство) — annoyance +4..+6, может быть ignore.` : ""}${ctx.recentIncomingIds?.length ? `
 - Реакции — реальные девушки 2026 чаще ставят TG-реакцию чем эмодзи в текст. Если сообщение цепануло, а отвечать не хочется — "intent":"reaction-only", "shouldReply":false, "reaction":"...". По умолчанию reaction="".
 - Если он ЯВНО просит поставить реакцию ("поставь реакцию", "лайкни", "сердечко поставь") — верни подходящий эмодзи в поле "reaction". Не игнорируй явную просьбу.
 - ВАЖНО: реакция должна соответствовать её отношению. Влюблённая НЕ ставит 🤡 на мем — она поставит 😂/❤ или мило посмеётся текстом. Холодная НЕ ставит ❤.` : ""}
@@ -120,6 +128,16 @@ export async function behaviorTick(
 ): Promise<BehaviorTickResult> {
   const stage = findStage(cfg.stage);
   const rel = await readRelationship(cfg.slug, ctx.fromId);
+  // Новый acquaintance-контакт (все нули = ещё не было взаимодействий) стартует с кредитом доверия.
+  // Иначе первый сексуальный opener сразу загоняет trust в -17 и бот уходит в холодный режим.
+  if (ctx.isAcquaintance) {
+    const s = rel.score;
+    const isNew = s.interest === 0 && s.trust === 0 && s.attraction === 0 && s.annoyance === 0 && s.cringe === 0;
+    if (isNew) {
+      s.trust = 20;
+      s.interest = 10;
+    }
+  }
   const communication = normalizeCommunicationProfile(cfg);
   const ignoreTendency = normalizeIgnoreTendency(cfg.ignoreTendency);
   const state = `stage=${cfg.stage} (${stage.label})\nscore=${JSON.stringify(rel.score)}\nbase_ignore=${stage.defaults.ignoreChance}\nbase_delay=${stage.defaults.replyDelaySec.join("..")}s\n${communicationDecisionState(communication)}\n${ignoreTendencyPrompt(ignoreTendency)}`;
