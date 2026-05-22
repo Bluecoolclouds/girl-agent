@@ -341,7 +341,9 @@ export function computePresenceState(
     nextCheckSec = 0;
   } else {
     // Time-of-day gates for pattern-specific behavior
-    const isEvening = localHour >= 18 || localHour < profile.sleepFrom;
+    // isEvening: 18:00 до сна — ночь уже обработана ветвью asleep выше.
+    const isEvening = localHour >= 18;
+    // isNightOwl: активна с 22:00 и до 8:00 (если не спит — asleep уже проверен).
     const isNightOwl = localHour >= 22 || localHour < 8;
     if (profile.pattern === "evening-only" && !isEvening) {
       online = false;
