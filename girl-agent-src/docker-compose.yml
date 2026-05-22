@@ -3,5 +3,10 @@ services:
     build: .
     container_name: girl-agent
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     volumes:
-      - ./data:/app/data
+      - ./data:/data
+    environment:
+      GIRL_AGENT_DATA: /data
+      GIRL_AGENT_HOST: 0.0.0.0
