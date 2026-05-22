@@ -10,7 +10,7 @@ import type { ProfileConfig } from "../types.js";
 import type { TgAdapter } from "../telegram/index.js";
 import { profileDir } from "../storage/md.js";
 
-const INDEX_FILE = "photos/index.md";
+const INDEX_FILE = "photos/channel.md";
 const SCAN_LIMIT = 200;
 
 export async function scanChannelPhotos(

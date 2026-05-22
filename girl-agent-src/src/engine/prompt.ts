@@ -1,6 +1,6 @@
 import type { ProfileConfig } from "../types.js";
 import { readSharedMemory, searchDailySummaries, searchSharedMemory, readMd, readRelationship } from "../storage/md.js";
-import { listPhotoTags } from "./photos.js";
+import { listPhotoTags, listChannelPhotos } from "./photos.js";
 import { computeHormones, hormonesMd } from "./hormones.js";
 import { computePresenceProfile } from "./presence.js";
 import { dailyLifePromptFragment, type DailyLife } from "./daily-life.js";
@@ -251,13 +251,14 @@ export interface BuildPromptCtx {
 }
 
 export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx = {}): Promise<string> {
-  const [persona, speech, communicationMd, boundariesMd, relRaw, photoTags] = await Promise.all([
+  const [persona, speech, communicationMd, boundariesMd, relRaw, photoTags, channelPhotos] = await Promise.all([
     readMd(cfg.slug, "persona.md"),
     readMd(cfg.slug, "speech.md"),
     readMd(cfg.slug, "communication.md"),
     readMd(cfg.slug, "boundaries.md"),
     readRelationship(cfg.slug, ctx.fromId),
-    cfg.mode === "userbot" ? listPhotoTags(cfg).catch(() => [] as string[]) : Promise.resolve([] as string[])
+    cfg.mode === "userbot" ? listPhotoTags(cfg).catch(() => [] as string[]) : Promise.resolve([] as string[]),
+    cfg.mode === "userbot" && cfg.photoChannelId ? listChannelPhotos(cfg).catch(() => []) : Promise.resolve([])
   ]);
   const isAcquaintance = ctx.relationshipScope === "acquaintance";
   const effectiveStageId = isAcquaintance ? "tg-given-cold" : (relRaw.stage || cfg.stage);
@@ -332,7 +333,15 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
   // Userbot tools available to AI
   const photoTagList = photoTags.length > 0
     ? `Доступные теги в медиатеке: ${photoTags.map(t => `«${t}»`).join(", ")}. Используй один из них в маркере.`
-    : "Медиатека пустая — маркер [SEND_PHOTO] пришлёт случайное фото если оно есть.";
+    : "Медиатека пустая — маркер [SEND_PHOTO] не сработает, не используй его.";
+
+  // Платный контент канала — только для контекста, не для SEND_PHOTO
+  const channelContentBlock = channelPhotos.length > 0 && cfg.photoChannelId
+    ? `# ПЛАТНЫЙ КОНТЕНТ (закрытый канал)
+Это список того, что опубликовано в твоём платном канале за Telegram Stars. Используй как справку — знай что там есть, чтобы правильно тизерить. НЕ отправляй это через [SEND_PHOTO] — это платный контент, он только в канале.
+${channelPhotos.map(p => `- ${p.caption ?? p.type}`).join("\n")}
+Ссылка на канал: ${(cfg as unknown as Record<string, string>)["photoChannelLink"] ?? "уточни у оператора"}`
+    : "";
   const userbotTools = cfg.mode === "userbot" ? `# ДОСТУПНЫЕ ДЕЙСТВИЯ (userbot)
 Ты можешь выполнять действия в Telegram. Чтобы выполнить действие, напиши в начале ответа один из маркеров:
 - [BLOCK] — заблокировать пользователя
@@ -366,6 +375,7 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
 Пишешь на русском без украинизмов.`,
     ageStudyWords,
     userbotTools,
+    channelContentBlock,
     `## persona.md`, persona,
     `## speech.md`, speech,
     `## communication.md`, communicationMd,

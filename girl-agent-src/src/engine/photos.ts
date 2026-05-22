@@ -170,3 +170,37 @@ export async function listPhotoTags(cfg: ProfileConfig): Promise<string[]> {
   for (const p of photos) for (const t of p.tags) tags.add(t);
   return [...tags].sort();
 }
+
+const CHANNEL_INDEX_FILE = "photos/channel.md";
+
+export interface ChannelPhotoEntry {
+  id: number;
+  type: string;
+  caption?: string;
+}
+
+/**
+ * Читает платный контент из photos/channel.md (результат сканирования канала).
+ * Используется только для контекста в промпте — NOT для SEND_PHOTO.
+ * Формат строки: msgId | type | caption
+ */
+export async function listChannelPhotos(cfg: ProfileConfig): Promise<ChannelPhotoEntry[]> {
+  const filePath = path.join(profileDir(cfg.slug), CHANNEL_INDEX_FILE);
+  let raw = "";
+  try { raw = await fs.readFile(filePath, "utf8"); } catch { return []; }
+
+  const entries: ChannelPhotoEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const parts = trimmed.split("|").map(x => x.trim());
+    const id = parseInt(parts[0] ?? "", 10);
+    if (isNaN(id)) continue;
+    entries.push({
+      id,
+      type: parts[1] ?? "photo",
+      caption: parts[2] || undefined
+    });
+  }
+  return entries;
+}
