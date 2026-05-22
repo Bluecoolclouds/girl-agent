@@ -714,7 +714,31 @@ export class Runtime extends EventEmitter {
       // Создаём/обновляем файл контакта чтобы он появился в WebUI
       await writeRelationship(this.cfg.slug, contactRel, m.fromId);
       this.emit("event", { type: "score", score: contactRel.score } as RuntimeEvent);
-      const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, { fromId: m.fromId });
+      // Полный контекст для acquaintance (как у primary) — иначе LLM не знает про subscriber-режим
+      const acqConflict = await readConflict(this.cfg.slug);
+      const { coldActive: acqColdActive } = activeConflict(acqConflict);
+      const acqForcedWake = Date.now() < this.forcedWakeUntil && (!this.forcedWakeChatId || this.forcedWakeChatId === key);
+      const acqPresence = computePresenceState(
+        this.cfg, this.presenceProfile,
+        this.lastUserMsgTs.get(key) ?? 0,
+        this.lastHerReplyTs.get(key) ?? 0,
+        this.exchangeCount.get(key) ?? 0,
+        acqForcedWake,
+        acqConflict
+      );
+      const acqActiveDialog = this.lastHerReplyTs.get(key)
+        ? Date.now() - (this.lastHerReplyTs.get(key) ?? 0) < 5 * 60 * 1000
+        : false;
+      const acqRecentIncomingIds = (this.incomingMsgIds.get(key) ?? []).map(e => ({ messageId: e.messageId, text: e.text }));
+      const tick = await behaviorTick(this.llm, this.cfg, hist, incomingText, {
+        fromId: m.fromId,
+        isAcquaintance: true,
+        presence: acqPresence,
+        conflict: acqConflict,
+        conflictColdActive: acqColdActive,
+        activeDialog: acqActiveDialog,
+        recentIncomingIds: acqRecentIncomingIds
+      });
       // Применяем moodDelta — обновляем скоры контакта
       if (tick.moodDelta && Object.keys(tick.moodDelta).length > 0) {
         const updatedRel = await readRelationship(this.cfg.slug, m.fromId);

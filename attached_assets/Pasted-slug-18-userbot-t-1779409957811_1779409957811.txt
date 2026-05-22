@@ -1,0 +1,117 @@
+slug: кристина
+Логи и статус
+Кристина · 18 · userbot
+‖ Пауза
+■ Стоп
+Статус
+● работаетстадия: tg-given-cold
+:status
+:why
+:wake
+:debug
+:resume
+:reset
+Интерес
+0
+Доверие
+0
+Влечение
+0
+Раздражение
+0
+Кринж
+0
+Live (29)
+Журнал по дням (0)
+События runtime'а
+поиск...
+
+все
+Очистить
+04:14:33
+[info]
+Telegram userbot запущен. Профиль: кристина | presence: phone-attached | communication: Болтушка
+04:14:33
+[info]
+channel-scan: добавлено 0 фото/видео в index.md (пропущено дублей: 2)
+04:15:06
+[info]
+online-heartbeat: появилась в сети (presence-online (phone-attached))
+04:18:17
+[incoming]
+А покажи фотки то свои тела
+04:18:22
+[outgoing]
+не сразу же
+04:18:22
+[incoming]
+Лучше ножек
+04:18:22
+[score]
+{"type":"score","score":{"interest":10,"trust":20,"attraction":0,"annoyance":0,"cringe":0},"t":1779409102571}
+04:18:30
+[score]
+{"type":"score","score":{"interest":8,"trust":17,"attraction":0,"annoyance":3,"cringe":2},"t":1779409110034}
+04:18:30
+[incoming]
+А что мне сделать)
+04:18:30
+[score]
+{"type":"score","score":{"interest":8,"trust":17,"attraction":0,"annoyance":3,"cringe":2},"t":1779409110574}
+04:18:31
+[outgoing]
+ты меня даже не знаешь толком )
+04:18:36
+[score]
+{"type":"score","score":{"interest":7,"trust":16,"attraction":0,"annoyance":4,"cringe":3},"t":1779409116902}
+04:18:44
+[incoming]
+🥺
+04:18:44
+[score]
+{"type":"score","score":{"interest":7,"trust":16,"attraction":0,"annoyance":4,"cringe":3},"t":1779409124674}
+04:18:48
+[incoming]
+Ты кристина
+04:18:48
+[score]
+{"type":"score","score":{"interest":7,"trust":16,"attraction":0,"annoyance":4,"cringe":3},"t":1779409128896}
+04:18:50
+[score]
+{"type":"score","score":{"interest":6,"trust":15,"attraction":0,"annoyance":6,"cringe":4},"t":1779409130560}
+04:18:52
+[incoming]
+Классная девочка
+04:18:52
+[score]
+{"type":"score","score":{"interest":6,"trust":15,"attraction":0,"annoyance":6,"cringe":4},"t":1779409132263}
+04:18:55
+[incoming]
+Любит фото себ
+04:18:55
+[score]
+{"type":"score","score":{"interest":6,"trust":15,"attraction":0,"annoyance":6,"cringe":4},"t":1779409135930}
+04:18:58
+[score]
+{"type":"score","score":{"interest":4,"trust":15,"attraction":0,"annoyance":7,"cringe":5},"t":1779409138296}
+04:19:07
+[score]
+{"type":"score","score":{"interest":3,"trust":15,"attraction":0,"annoyance":8,"cringe":6},"t":1779409147937}
+04:19:16
+[score]
+{"type":"score","score":{"interest":2,"trust":15,"attraction":0,"annoyance":9,"cringe":7},"t":1779409156160}
+04:19:44
+[info]
+❤ (acquaintance-react)
+04:21:09
+[incoming]
+Скинь фотки свои я куплю щас
+04:21:09
+[score]
+{"type":"score","score":{"interest":10,"trust":20,"attraction":0,"annoyance":0,"cringe":0},"t":1779409269199}
+04:21:19
+[score]
+{"type":"score","score":{"interest":15,"trust":21,"attraction":0,"annoyance":0,"cringe":0},"t":1779409279390}
+04:21:31
+[info]
+❤ (acquaintance-react)
