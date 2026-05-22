@@ -730,7 +730,7 @@ export class Runtime extends EventEmitter {
           : 0.35;
         if (Math.random() < reactChance) {
           const target = this.pickReactionTarget(key, m.messageId);
-          const reactDelay = Math.max(2_000, tick.delaySec * 1000 * 0.4 + Math.random() * 3_000);
+          const reactDelay = Math.random() * 2_000;
           setTimeout(async () => {
             if (this.userbotActionAvailable("readHistory")) {
               await this.tg.readHistory?.(m.chatId).catch(() => {});
