@@ -649,8 +649,10 @@ export class Runtime extends EventEmitter {
       }
       // Load per-contact stage and scores
       const contactRel = await readRelationship(this.cfg.slug, m.fromId);
-      this.cfg.stage = contactRel.stage as typeof this.cfg.stage;
-      if (isPrimary && this.cfg.stage === "dumped") {
+      // НЕ мутируем this.cfg.stage глобально — при параллельных чатах это race condition.
+      // Используем локальную переменную для этого вызова.
+      let localStage = (contactRel.stage || this.cfg.stage) as typeof this.cfg.stage;
+      if (isPrimary && localStage === "dumped") {
         this.emit("event", { type: "ignored", text: m.text, reason: "dumped" } as RuntimeEvent);
         return;
       }
@@ -750,14 +752,14 @@ export class Runtime extends EventEmitter {
       if (tick.moodDelta && Object.keys(tick.moodDelta).length > 0) {
         const updatedRel = await readRelationship(this.cfg.slug, m.fromId);
         const newScore = applyMoodDelta(updatedRel.score, tick.moodDelta);
-        await writeRelationship(this.cfg.slug, { ...updatedRel, score: newScore, stage: this.cfg.stage }, m.fromId);
+        await writeRelationship(this.cfg.slug, { ...updatedRel, score: newScore, stage: updatedRel.stage }, m.fromId);
         this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
       }
       // Реакция для acquaintance — ставим в то же окно что и ответ (readHistory уже в sendBubbles)
       if (this.cfg.mode === "userbot") {
-        const reactChance = ["long-term", "dating-stable"].includes(this.cfg.stage) ? 0.5
-          : this.cfg.stage === "dating-early" ? 0.5
-          : ["warming", "tg-given"].includes(this.cfg.stage) ? 0.45
+        const reactChance = ["long-term", "dating-stable"].includes(localStage) ? 0.5
+          : localStage === "dating-early" ? 0.5
+          : ["warming", "tg-given"].includes(localStage) ? 0.45
           : 0.35;
         if (Math.random() < reactChance) {
           const target = this.pickReactionTarget(key, m.messageId);
@@ -863,7 +865,7 @@ export class Runtime extends EventEmitter {
     if (tick.moodDelta) {
       const rel = await readRelationship(this.cfg.slug, m.fromId);
       const newScore = applyMoodDelta(rel.score, tick.moodDelta);
-      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: this.cfg.stage }, m.fromId);
+      await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: rel.stage }, m.fromId);
       this.emit("event", { type: "score", score: newScore } as RuntimeEvent);
 
       // Эскалация / смягчение конфликта
@@ -882,8 +884,8 @@ export class Runtime extends EventEmitter {
       }
 
       // авто-dumped если очень плохо
-      if (newScore.annoyance > 80 && newScore.interest < -30 && (this.cfg.stage as string) !== "dumped") {
-        this.cfg.stage = "dumped";
+      if (newScore.annoyance > 80 && newScore.interest < -30 && (localStage as string) !== "dumped") {
+        localStage = "dumped";
         await writeRelationship(this.cfg.slug, { ...rel, score: newScore, stage: "dumped" }, m.fromId);
         await maybeAdvanceRelationshipTimeline(this.cfg, rel.stage, "dumped");
         const agenda = await readAgenda(this.cfg.slug);
@@ -915,13 +917,13 @@ export class Runtime extends EventEmitter {
 
     // fallback-реакция когда она отвечает но LLM не вернул reaction
     if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot") {
-      const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
+      const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(localStage)
         ? ["❤", 0.5] as const
-        : this.cfg.stage === "dating-early"
+        : localStage === "dating-early"
         ? ["❤", 0.5] as const
-        : ["warming", "tg-given"].includes(this.cfg.stage)
+        : ["warming", "tg-given"].includes(localStage)
         ? ["❤", 0.45] as const
-        : this.cfg.stage === "tg-given-cold"
+        : localStage === "tg-given-cold"
         ? ["❤", 0.35] as const
         : ["❤", 0.35] as const;
       if (Math.random() < fbChance) {
@@ -948,13 +950,13 @@ export class Runtime extends EventEmitter {
       }
       // реакция при прочтении без ответа (если behaviorTick не вернул реакцию)
       if (!tick.reaction && tick.shouldRead && this.cfg.mode === "userbot" && tick.intent !== "leave-chat") {
-        const [readEmoji, readChance] = ["long-term", "dating-stable"].includes(this.cfg.stage)
+        const [readEmoji, readChance] = ["long-term", "dating-stable"].includes(localStage)
           ? ["❤", 0.5] as const
-          : this.cfg.stage === "dating-early"
+          : localStage === "dating-early"
           ? ["❤", 0.5] as const
-          : ["warming", "tg-given"].includes(this.cfg.stage)
+          : ["warming", "tg-given"].includes(localStage)
           ? ["❤", 0.45] as const
-          : this.cfg.stage === "tg-given-cold"
+          : localStage === "tg-given-cold"
           ? ["❤", 0.35] as const
           : ["❤", 0.35] as const;
         if (Math.random() < readChance) {
