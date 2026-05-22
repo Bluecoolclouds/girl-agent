@@ -143,6 +143,13 @@ export class Runtime extends EventEmitter {
       });
     }
 
+    // Авто-обрезка sentMessages — держим только последние 2ч.
+    // При 1000 чатах без этого массив растёт бесконечно.
+    setInterval(() => {
+      const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+      this.sentMessages = this.sentMessages.filter(m => m.ts >= cutoff);
+    }, 15 * 60 * 1000).unref?.();
+
     // запускаем agenda-scheduler (раз в 60с проверяет due items)
     this.agendaTimer = setInterval(() => this.tickAgenda().catch(e =>
       this.emit("event", { type: "error", text: "agenda tick: " + (e as Error).message } as RuntimeEvent)

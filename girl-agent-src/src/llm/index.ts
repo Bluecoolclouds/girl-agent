@@ -56,26 +56,32 @@ export interface LLMClient {
 const LLM_TIMEOUT_MS = 120_000;
 const LLM_MAX_RETRIES = 1;
 
-let llmQueueTail: Promise<void> = Promise.resolve();
+// Semaphore: max concurrent LLM calls. Serial (1) was fine for 1 chat,
+// but at 1000 chats the last person would wait ~83 min. 5 concurrent
+// is a safe balance between API rate limits and response latency.
+const LLM_MAX_CONCURRENT = 5;
+let llmActiveCount = 0;
+const llmWaiters: Array<() => void> = [];
 
 class SerializedLLMClient implements LLMClient {
   constructor(private inner: LLMClient) {}
 
   chat(messages: ChatMessage[], opts: LLMOptions = {}): Promise<string> {
-    return runExclusiveLLM(() => this.inner.chat(messages, opts));
+    return runConcurrentLLM(() => this.inner.chat(messages, opts));
   }
 }
 
-async function runExclusiveLLM<T>(task: () => Promise<T>): Promise<T> {
-  const previous = llmQueueTail.catch(() => undefined);
-  let release = () => {};
-  const current = new Promise<void>(resolve => { release = resolve; });
-  llmQueueTail = previous.then(() => current);
-  await previous;
+async function runConcurrentLLM<T>(task: () => Promise<T>): Promise<T> {
+  if (llmActiveCount >= LLM_MAX_CONCURRENT) {
+    await new Promise<void>(resolve => llmWaiters.push(resolve));
+  }
+  llmActiveCount++;
   try {
     return await task();
   } finally {
-    release();
+    llmActiveCount--;
+    const next = llmWaiters.shift();
+    if (next) next();
   }
 }
 
