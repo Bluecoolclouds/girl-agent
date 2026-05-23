@@ -1,4 +1,4 @@
-import type { ProfileConfig } from "../types.js";
+import type { ProfileConfig, StageId } from "../types.js";
 import { readSharedMemory, searchDailySummaries, searchSharedMemory, readMd, readRelationship } from "../storage/md.js";
 import { listPhotoTags, listChannelPhotos } from "./photos.js";
 import { computeHormones, hormonesMd } from "./hormones.js";
@@ -10,6 +10,7 @@ import { mediaPromptFragment } from "./media.js";
 import type { IncomingMedia } from "../telegram/index.js";
 import { findStage } from "../presets/stages.js";
 import { communicationPromptFragment, ignoreTendencyPrompt, normalizeCommunicationProfile } from "../presets/communication.js";
+import { contentStrategyFragment } from "./content-strategy.js";
 
 export type RelationshipScope = "primary" | "acquaintance";
 
@@ -329,6 +330,9 @@ ${ctx.romanticApproach ? `Последнее сообщение выглядит
 
   const communicationFragment = communicationPromptFragment(communication);
   const ignoreTendency = ignoreTendencyPrompt(cfg.ignoreTendency);
+  const contentStrategy = !isAcquaintance
+    ? contentStrategyFragment(effectiveStageId as StageId, photoTags)
+    : "";
 
   // Userbot tools available to AI
   const photoTagList = photoTags.length > 0
@@ -376,6 +380,7 @@ ${channelPhotos.map(p => `- ${p.caption ?? p.type}`).join("\n")}
     ageStudyWords,
     userbotTools,
     channelContentBlock,
+    contentStrategy,
     `## persona.md`, persona,
     `## speech.md`, speech,
     `## communication.md`, communicationMd,
