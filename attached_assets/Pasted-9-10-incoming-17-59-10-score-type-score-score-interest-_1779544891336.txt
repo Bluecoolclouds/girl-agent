@@ -1,0 +1,176 @@
+9:10
+[incoming]
+[он прислал стикер 👋]
+17:59:10
+[score]
+{"type":"score","score":{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544750088}
+17:59:10
+[info]
+sticker saved: 👋 gramjs:543633522691146956:-858…
+17:59:10
+[incoming]
+[отвечает на: «ты сам откуда вообще»]
+Дербышки
+17:59:10
+[score]
+{"type":"score","score":{"interest":3,"trust":1,"attraction":50,"annoyance":0,"cringe":0},"t":1779544750900}
+17:59:12
+[outgoing]
+я личное сразу не вываливаю
+17:59:12
+[incoming]
+А ты?
+17:59:12
+[score]
+{"type":"score","score":{"interest":3,"trust":1,"attraction":50,"annoyance":0,"cringe":0},"t":1779544752886}
+17:59:15
+[score]
+{"type":"score","score":{"interest":7,"trust":30,"attraction":50,"annoyance":0,"cringe":0},"t":1779544755157}
+17:59:15
+[info]
+❤ (acquaintance-react)
+17:59:17
+[outgoing]
+с кем именно)
+17:59:18
+[incoming]
+[отвечает на: «а ты чего не спишь ой не, уже день пхпх»]
+конечно
+17:59:18
+[score]
+{"type":"score","score":{"interest":40,"trust":1,"attraction":0,"annoyance":2,"cringe":0},"t":1779544758524}
+17:59:21
+[outgoing]
+фоточки не просто так показываю)
+17:59:23
+[score]
+{"type":"score","score":{"interest":41,"trust":1,"attraction":0,"annoyance":2,"cringe":0},"t":1779544763967}
+17:59:24
+[incoming]
+Окей сделаем вид будто все ок
+17:59:24
+[score]
+{"type":"score","score":{"interest":41,"trust":1,"attraction":50,"annoyance":0,"cringe":0},"t":1779544764339}
+17:59:31
+[score]
+{"type":"score","score":{"interest":8,"trust":30,"attraction":50,"annoyance":0,"cringe":0},"t":1779544771588}
+17:59:38
+[incoming]
+что у тебя за ник такой
+17:59:38
+[score]
+{"type":"score","score":{"interest":8,"trust":30,"attraction":50,"annoyance":0,"cringe":0},"t":1779544778402}
+17:59:40
+[score]
+{"type":"score","score":{"interest":8,"trust":30,"attraction":50,"annoyance":0,"cringe":0},"t":1779544780515}
+17:59:42
+[info]
+❤ (acquaintance-react)
+17:59:44
+[incoming]
+Давай отличного тебе дня 😊
+17:59:44
+[score]
+{"type":"score","score":{"interest":41,"trust":1,"attraction":50,"annoyance":0,"cringe":0},"t":1779544784891}
+17:59:45
+[score]
+{"type":"score","score":{"interest":0,"trust":30,"attraction":0,"annoyance":0,"cringe":0},"t":1779544785155}
+17:59:50
+[incoming]
+мне очень интересно
+17:59:50
+[score]
+{"type":"score","score":{"interest":40,"trust":1,"attraction":0,"annoyance":0,"cringe":0},"t":1779544790819}
+17:59:56
+[score]
+{"type":"score","score":{"interest":-1,"trust":30,"attraction":0,"annoyance":0,"cringe":0},"t":1779544796293}
+17:59:58
+[incoming]
+Бля иди нахуй
+17:59:58
+[score]
+{"type":"score","score":{"interest":10,"trust":4,"attraction":50,"annoyance":0,"cringe":0},"t":1779544798086}
+17:59:59
+[score]
+{"type":"score","score":{"interest":-37,"trust":0,"attraction":-3,"annoyance":100,"cringe":100},"t":1779544799945}
+18:00:01
+[info]
+delete: saw-not-read "Бля иди нахуй"
+18:00:01
+[info]
+delete: saw-not-read "Из Казани ведь )?"
+18:00:01
+[info]
+delete: saw-not-read "Привет"
+18:00:01
+[outgoing]
+я в нн щас
+18:00:06
+[incoming]
+как в твоей голове выглядит нормальное знакомство
+18:00:06
+[score]
+{"type":"score","score":{"interest":40,"trust":1,"attraction":0,"annoyance":0,"cringe":0},"t":1779544806293}
+18:00:27
+[outgoing]
+привет)
+18:00:33
+[incoming]
+Привет
+18:00:33
+[score]
+{"type":"score","score":{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544833429}
+18:00:35
+[outgoing]
+пхпх, уже всё про меня решил
+18:00:36
+[score]
+{"type":"score","score":{"interest":9,"trust":31,"attraction":50,"annoyance":0,"cringe":0},"t":1779544836380}
+18:00:37
+[score]
+{"type":"score","score":{"interest":10,"trust":31,"attraction":50,"annoyance":0,"cringe":0},"t":1779544837750}
+18:00:38
+[info]
+❤ (acquaintance-react)
+18:00:52
+[incoming]
+приветик еще раз
+18:00:52
+[score]
+{"type":"score","score":{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544852711}
+18:00:53
+[score]
+{"type":"score","score":{"interest":1,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544853083}
+18:00:55
+[score]
+{"type":"score","score":{"interest":5,"trust":2,"attraction":50,"annoyance":0,"cringe":0},"t":1779544855879}
+18:01:02
+[incoming]
+Как тебя зовут?
+18:01:02
+[score]
+{"type":"score","score":{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544862033}
+18:01:10
+[incoming]
+я бы не против узнать твоего имени
+18:01:10
+[score]
+{"type":"score","score":{"interest":0,"trust":0,"attraction":0,"annoyance":0,"cringe":0},"t":1779544870514}
+18:01:14
+[score]
+{"type":"score","score":{"interest":6,"trust":3,"attraction":50,"annoyance":0,"cringe":0},"t":1779544874157}
+18:01:15
+[info]
+❤ (acquaintance-react)
+18:01:19
+[score]
+{"type":"score","score":{"interest":7,"trust":4,"attraction":50,"annoyance":0,"cringe":0},"t":1779544879144}
+18:01:19
+[outgoing]
+ну это уже лучше звучит)
+18:01:21
+[outgoing]
+пхпх
+18:01:29
+[outgoing]
+тебе прям всё надо сразу понять?
