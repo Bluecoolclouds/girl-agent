@@ -82,7 +82,18 @@ export interface TgAdapter {
   getSelf?(): { username?: string; displayName?: string };
   /** Итерирует сообщения с медиа из канала — для автосканирования photos/index.md. */
   iterChannelMedia?(channelId: string, limit: number): AsyncIterable<{ id: number; type: "photo" | "video"; caption: string }>;
+  /** Возвращает список диалогов юзербота (только userbot-режим, bot API не поддерживает). */
+  getDialogs?(): Promise<DialogEntry[]>;
   stop(): Promise<void>;
+}
+
+export interface DialogEntry {
+  chatId: number;
+  name: string;
+  username?: string;
+  lastMessageText: string;
+  lastMessageDate: number;
+  lastMessageOutgoing: boolean;
 }
 
 export async function makeTgAdapter(cfg: ProfileConfig): Promise<TgAdapter> {

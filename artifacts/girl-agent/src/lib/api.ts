@@ -254,7 +254,20 @@ export const api = {
   async deletePhoto(slug: string, filename: string) {
     return req<{ ok: true }>("DELETE", `/api/profiles/${encodeURIComponent(slug)}/photos/${encodeURIComponent(filename)}`);
   },
+
+  async getDialogs(slug: string) {
+    return req<{ dialogs: DialogEntry[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/dialogs`);
+  },
 };
+
+export interface DialogEntry {
+  chatId: number;
+  name: string;
+  username?: string;
+  lastMessageText: string;
+  lastMessageDate: number;
+  lastMessageOutgoing: boolean;
+}
 
 export interface PhotoEntry {
   filename: string;

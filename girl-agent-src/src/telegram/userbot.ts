@@ -2,7 +2,7 @@ import { TelegramClient, Api } from "telegram";
 import bigInt from "big-integer";
 import { StringSession } from "telegram/sessions/index.js";
 import type { ProfileConfig } from "../types.js";
-import type { IncomingMedia, TgAdapter } from "./index.js";
+import type { IncomingMedia, TgAdapter, DialogEntry } from "./index.js";
 import { NewMessage } from "telegram/events/index.js";
 import { Raw } from "telegram/events/Raw.js";
 import type { ProxyInterface } from "telegram/network/connection/TCPMTProxy.js";
@@ -501,6 +501,28 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         yield { id: m.id, type: (hasVideo ? "video" : "photo") as "photo" | "video", caption };
       }
       process.stderr.write(`[channel-scan] итого сообщений=${total} с медиа=${withMedia}\n`);
+    },
+    async getDialogs(): Promise<DialogEntry[]> {
+      const results: DialogEntry[] = [];
+      for await (const dialog of client.iterDialogs({ limit: 500 })) {
+        const entity = dialog.entity as any;
+        if (!entity) continue;
+        const className: string = entity.className ?? "";
+        if (className === "Channel" && entity.broadcast) continue;
+        const chatId = Number(entity.id ?? 0);
+        if (!chatId) continue;
+        const firstName: string = entity.firstName ?? "";
+        const lastName: string = entity.lastName ?? "";
+        const title: string = entity.title ?? "";
+        const name = title || [firstName, lastName].filter(Boolean).join(" ") || String(chatId);
+        const username: string | undefined = entity.username ?? undefined;
+        const msg = dialog.message as any;
+        const lastMessageText = String(msg?.message ?? msg?.action?.className ?? "").slice(0, 300);
+        const lastMessageDate = Number(msg?.date ?? 0) * 1000;
+        const lastMessageOutgoing = Boolean(msg?.out);
+        results.push({ chatId, name, username, lastMessageText, lastMessageDate, lastMessageOutgoing });
+      }
+      return results;
     },
     async stop() {
       await client.disconnect();

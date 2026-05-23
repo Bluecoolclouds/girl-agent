@@ -6,6 +6,7 @@ const ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "assistant", label: "Помощник", icon: "✦" },
   { id: "logs", label: "Логи / статус", icon: "≡" },
   { id: "relationship", label: "Отношения", icon: "♥" },
+  { id: "dialogs", label: "Диалоги", icon: "⊟" },
   { id: "configuration", label: "Конфигурация", icon: "⚙" },
   { id: "memory", label: "Память", icon: "❀" },
   { id: "media", label: "Медиатека", icon: "◈" },

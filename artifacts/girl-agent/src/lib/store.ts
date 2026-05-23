@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { api, type ProfileSummary, type ProfileConfig } from "./api";
 
-export type Tab = "assistant" | "logs" | "relationship" | "configuration" | "memory" | "addons" | "diagnostics" | "media";
+export type Tab = "assistant" | "logs" | "relationship" | "configuration" | "memory" | "addons" | "diagnostics" | "media" | "dialogs";
 
 interface Toast {
   id: number;

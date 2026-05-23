@@ -1251,6 +1251,11 @@ export class Runtime extends EventEmitter {
     this.cfg.stage = stage as typeof this.cfg.stage;
   }
 
+  async getDialogs() {
+    if (!this.tg.getDialogs) throw new Error("getDialogs не поддерживается в bot-режиме");
+    return this.tg.getDialogs();
+  }
+
   async cmdStatus(): Promise<string> {
     const rel = await readRelationship(this.cfg.slug, this.cfg.ownerId ?? undefined);
     // rel.stage актуальнее — файл мог обновиться через WebUI PATCH

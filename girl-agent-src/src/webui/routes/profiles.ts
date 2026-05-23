@@ -413,6 +413,18 @@ export function registerProfileRoutes(r: Router): void {
     return { ok: true, busySchedule: generated.busySchedule };
   });
 
+  // Диалоги (только userbot-режим)
+  r.get("/api/profiles/:slug/dialogs", async ({ params }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    if (cfg.mode !== "userbot") throw new HttpError(400, "dialogs available only in userbot mode");
+    const rt = bus.get(slug);
+    if (!rt) throw new HttpError(400, "runtime not running — start the agent first");
+    const dialogs = await rt.getDialogs();
+    return { dialogs };
+  });
+
   // Diagnostics: which preset id? get the list
   r.get("/api/presets/llm-detect", async ({ searchParams }) => {
     const id = searchParams.get("id") ?? "";
