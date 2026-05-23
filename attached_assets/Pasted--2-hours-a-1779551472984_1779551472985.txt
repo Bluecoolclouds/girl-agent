@@ -1,0 +1,89 @@
+посмотри агент работает ли так чтобы сама тоже хотела строить отношения с покупателем ?
+
+2 hours ago
+
+2 messages & 3 actions
+
+Worked for 44 seconds
+если она узнает город какого то собеседнки то в хранилище чата с собеседником это появится? чтобы например не перепутала двух разных клиентов
+
+2 hours ago
+
+1 message & 3 actions
+
+Worked for 46 seconds
+почему то слишком жестко оценивает что ли, некоторые на 99 кринж и раздражении
+а остальное вообще никак не повышается
+
+2 hours ago
+
+7 messages & 23 actions
+
+Checkpoint made
+2 hours ago
+
+Worked for 1 minute
+
+Pasted-9-10-incoming-17-59-10-score-type-score-score-interest-_1779544891336.txt
+почему то не скинула из канала приватные фотки ?
+
+2 hours ago
+
+5 messages & 13 actions
+
+Worked for 2 minutes
+Not quite there? Switch to Power Mode for stronger performance.
+
+Dismiss
+
+Switch to Power
+а если много чатов то не будет ли рейт лимита или все в очереди
+
+50 minutes ago
+
+3 messages & 10 actions
+
+Worked for 1 minute
+может ли он на старые неотвеченные сообщения начать отвечать?
+
+36 minutes ago
+
+2 messages & 13 actions
+
+Worked for 50 seconds
+у нас старые чаты висят. а длячаттера мне кажется это неправильно.?
+
+28 minutes ago
+
+3 messages & 9 actions
+
+Worked for 1 minute
+да, историю я думаю можно там общий контекст за день вроде есть
+
+22 minutes ago
+
+1 message & 6 actions
+
+Proposed 1 task
+
+Worked for 45 seconds
+
+Started task
+Evict stale chat histories from memory
+The in-memory histories Map grows indefinitely — every chat loaded since process start stays in RAM forever. For a high-volume chatter with hundreds of subscribers, this causes unbounded memory growth. Additionally, when a subscriber returns after days, up to 80 old turns get restored into context, which is excessive for short acquaintance conversations. Daily summaries already capture the broader per-day context, so raw turn history can be kept shorter.
+
+
+View plan
+
+Checkpoint made
+21 minutes ago
+
+9 messages & 31 actions
+
+Worked for 6 minutes
+всё готово?
+
+2 minutes ago
+
+1 message & 1 action
+а память долгосрочная остается типа выжимки? и сделай файл changes2.md гед опишешь что сделал на какой строке и тд
