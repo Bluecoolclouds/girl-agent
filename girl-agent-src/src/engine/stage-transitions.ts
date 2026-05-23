@@ -25,12 +25,31 @@ export interface StageTransitionContext {
   hisMessagesInStage: number;
   ignoresInStage: number;
   hasActiveConflict?: boolean;
+  /** Последнее входящее сообщение для детекции сигнала покупки. */
+  lastIncomingText?: string;
+  /** Если true — явный сигнал покупки пропускает порог минимума сообщений. */
+  intentJumpEnabled?: boolean;
 }
 
 export interface StageTransitionResult {
   next: StageId;
   reason: string;
   direction: "up" | "down";
+}
+
+/** Ключевые фразы явного интереса к покупке/контенту (RU + транслит). */
+const INTENT_PATTERNS = [
+  /сколько стоит/i, /как купить/i, /хочу купить/i, /готов купить/i,
+  /хочу посмотреть/i, /как оплатить/i, /где купить/i, /есть ссылка/i,
+  /скинь ссылку/i, /как подписаться/i, /хочу доступ/i, /дай ссылку/i,
+  /покажи фото/i, /покажи видео/i, /скинь фото/i, /скинь видео/i,
+  /пришли фото/i, /пришли видео/i, /хочу увидеть/i, /хочу посмотреть/i,
+  /есть of\b/i, /есть онли/i, /onlyfans/i, /boosty/i,
+  /готов платить/i, /сколько берёшь/i, /сколько берешь/i,
+];
+
+export function hasPurchaseIntent(text: string): boolean {
+  return INTENT_PATTERNS.some(p => p.test(text));
 }
 
 const STAGE_ORDER: StageId[] = [
@@ -54,6 +73,14 @@ export function decideStageTransition(ctx: StageTransitionContext): StageTransit
   const { score } = ctx;
   const idx = stageIndex(ctx.currentStage);
   if (idx < 0) return null;
+
+  // Intent jump: явный сигнал покупки на холодных стадиях → сразу на "горячий"
+  if (ctx.intentJumpEnabled && ctx.lastIncomingText && hasPurchaseIntent(ctx.lastIncomingText)) {
+    const coldStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming", "convinced"];
+    if (coldStages.includes(ctx.currentStage)) {
+      return { next: "first-date-done", reason: "intent-jump: явный сигнал покупки", direction: "up" };
+    }
+  }
 
   // Понижение — приоритетнее
   const wantsDowngrade = wantsDowngradeFor(ctx);
@@ -101,7 +128,11 @@ function wantsDowngradeFor(ctx: StageTransitionContext): string | null {
 
 function wantsUpgradeFor(ctx: StageTransitionContext): string | null {
   const { score, currentStage, herMessagesInStage } = ctx;
-  const MIN_HER = 5;
+  const intentSignal = ctx.intentJumpEnabled && ctx.lastIncomingText
+    ? hasPurchaseIntent(ctx.lastIncomingText)
+    : false;
+  // Явный сигнал покупки — пропускаем порог минимума сообщений
+  const MIN_HER = intentSignal ? 0 : 5;
   if (herMessagesInStage < MIN_HER) return null;
 
   switch (currentStage) {

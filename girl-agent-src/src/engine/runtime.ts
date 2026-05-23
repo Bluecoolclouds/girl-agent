@@ -1033,9 +1033,10 @@ export class Runtime extends EventEmitter {
     }
 
     // Task #4: умная смена стадии (проверка раз в 5 сообщений).
+    // Intent jump: если включён режим — проверяем на КАЖДОЕ сообщение (не ждём 5).
     this.msgsSinceStageCheck++;
-    if (shouldRunStageTransitionCheck(this.msgsSinceStageCheck)) {
-      this.checkStageTransition(m.fromId).catch(() => {});
+    if (this.cfg.intentStageJump || shouldRunStageTransitionCheck(this.msgsSinceStageCheck)) {
+      this.checkStageTransition(m.fromId, incomingText).catch(() => {});
     }
 
     if (!tick.shouldReply) {
@@ -1978,7 +1979,7 @@ export class Runtime extends EventEmitter {
     if (who === "her") s.herMsgs++; else s.hisMsgs++;
   }
 
-  private async checkStageTransition(fromId: number): Promise<void> {
+  private async checkStageTransition(fromId: number, lastIncomingText?: string): Promise<void> {
     if (this.paused) return;
     this.msgsSinceStageCheck = 0;
     try {
@@ -1990,7 +1991,9 @@ export class Runtime extends EventEmitter {
         herMessagesInStage: s?.herMsgs ?? 0,
         hisMessagesInStage: s?.hisMsgs ?? 0,
         ignoresInStage: s?.ignoresInStage ?? 0,
-        hasActiveConflict: false
+        hasActiveConflict: false,
+        lastIncomingText,
+        intentJumpEnabled: this.cfg.intentStageJump ?? false,
       });
       if (!decision) return;
       const oldStage = this.cfg.stage;

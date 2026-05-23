@@ -157,6 +157,8 @@ export interface ProfileConfig {
   photoChannelLink?: string;
   /** Авто ре-энгейджмент: если > 0, агент раз в сутки пишет тем кто молчит дольше N дней (не более 10 за сутки). 0 = выключено. */
   reengageAfterDays?: number;
+  /** Быстрый переход стадии по сигналу покупки: если true, явный интерес к контенту/цене пропускает порог сообщений. */
+  intentStageJump?: boolean;
 }
 
 export interface RelationshipScore {

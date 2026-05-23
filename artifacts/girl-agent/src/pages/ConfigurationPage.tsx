@@ -302,6 +302,27 @@ export function ConfigurationPage() {
 
       <div className="card">
         <div className="card-header">
+          <div className="h-title">Переход по сигналу покупки</div>
+        </div>
+        <div className="form-row">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={(merged as any).intentStageJump ?? false}
+              onChange={e => pf("intentStageJump" as any, e.target.checked)}
+            />
+            <span>Включить быстрый переход стадии</span>
+          </label>
+          <div className="hint">
+            {(merged as any).intentStageJump
+              ? "Включено. Если подписчик напишет «сколько стоит», «хочу купить», «покажи» и т.п. — стадия сразу переходит на «горячий», не ожидая набора скоров."
+              : "Выключено. Переход между стадиями идёт только по скорам (interest/trust/attraction)."}
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
           <div className="h-title">Авто ре-энгейджмент</div>
           <div className="h-meta">только userbot</div>
         </div>
