@@ -111,6 +111,7 @@ export class Runtime extends EventEmitter {
   private lastDecision = new Map<string, DecisionSnapshot>();
   private incomingSeq = new Map<string, number>();
   private tgSelf: { username?: string; displayName?: string } = {};
+  private broadcastJobs = new Map<string, { total: number; sent: number; failed: number; done: boolean; errors: { chatId: number; error: string }[] }>();
 
   constructor(public cfg: ProfileConfig) {
     super();
@@ -1254,6 +1255,44 @@ export class Runtime extends EventEmitter {
   async getDialogs() {
     if (!this.tg.getDialogs) throw new Error("getDialogs не поддерживается в bot-режиме");
     return this.tg.getDialogs();
+  }
+
+  getBroadcastJob(jobId: string) {
+    return this.broadcastJobs.get(jobId) ?? null;
+  }
+
+  startBroadcast(jobId: string, recipients: number[], payload: { text?: string; forwardFromChannelId?: number; forwardMsgId?: number }): void {
+    const job = { total: recipients.length, sent: 0, failed: 0, done: false, errors: [] as { chatId: number; error: string }[] };
+    this.broadcastJobs.set(jobId, job);
+    void this._runBroadcast(jobId, recipients, payload);
+  }
+
+  private async _runBroadcast(jobId: string, recipients: number[], payload: { text?: string; forwardFromChannelId?: number; forwardMsgId?: number }): Promise<void> {
+    const job = this.broadcastJobs.get(jobId)!;
+    for (const chatId of recipients) {
+      try {
+        if (payload.text) {
+          await this.tg.sendText(chatId, payload.text);
+        } else if (payload.forwardFromChannelId !== undefined && payload.forwardMsgId !== undefined) {
+          if (!this.tg.forwardMessage) throw new Error("forwardMessage не поддерживается");
+          await this.tg.forwardMessage(payload.forwardFromChannelId, payload.forwardMsgId, chatId);
+        } else {
+          throw new Error("не задан текст или forwardMsgId");
+        }
+        job.sent++;
+        this.emit("event", { type: "info", text: `[broadcast:${jobId}] отправлено ${job.sent}/${job.total} → ${chatId}` } as RuntimeEvent);
+      } catch (e) {
+        job.failed++;
+        job.errors.push({ chatId, error: (e as Error)?.message ?? String(e) });
+        this.emit("event", { type: "error", text: `[broadcast:${jobId}] ошибка → ${chatId}: ${(e as Error)?.message ?? String(e)}` } as RuntimeEvent);
+      }
+      if (chatId !== recipients[recipients.length - 1]) {
+        const delay = 3000 + Math.floor(Math.random() * 5000);
+        await sleep(delay);
+      }
+    }
+    job.done = true;
+    this.emit("event", { type: "info", text: `[broadcast:${jobId}] завершено: отправлено ${job.sent}, ошибок ${job.failed}` } as RuntimeEvent);
   }
 
   async cmdStatus(): Promise<string> {

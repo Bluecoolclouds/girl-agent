@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../lib/store";
 import { api, type DialogEntry } from "../lib/api";
+import { BroadcastPanel } from "../components/BroadcastPanel";
 
 function formatDate(ms: number): string {
   if (!ms) return "—";
@@ -106,6 +107,7 @@ export function DialogsPage() {
 
   return (
     <div className="grid" style={{ gap: 16, maxWidth: 960 }}>
+      <BroadcastPanel dialogs={dialogs} dialogsLoaded={loaded} />
       <div className="card">
         <div className="card-header">
           <div className="h-title">Диалоги</div>

@@ -23,6 +23,7 @@ export interface ProfileConfig {
   communication?: { notifications: string; messageStyle: string; initiative: string; lifeSharing: string };
   personaNotes?: string;
   busySchedule?: { dayOfWeek: number; startHour: number; endHour: number; reason?: string }[];
+  photoChannelId?: string;
 }
 
 export interface LLMPreset {
@@ -257,6 +258,16 @@ export const api = {
 
   async getDialogs(slug: string) {
     return req<{ dialogs: DialogEntry[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/dialogs`);
+  },
+
+  async startBroadcast(slug: string, payload: { recipients: number[]; text?: string; forwardFromChannelMsgId?: number }) {
+    return req<{ jobId: string; total: number }>("POST", `/api/profiles/${encodeURIComponent(slug)}/broadcast`, payload);
+  },
+
+  async getBroadcastStatus(slug: string, jobId: string) {
+    return req<{ total: number; sent: number; failed: number; done: boolean; errors: { chatId: number; error: string }[] }>(
+      "GET", `/api/profiles/${encodeURIComponent(slug)}/broadcast/${encodeURIComponent(jobId)}`
+    );
   },
 };
 

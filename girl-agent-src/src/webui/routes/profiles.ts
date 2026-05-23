@@ -413,6 +413,42 @@ export function registerProfileRoutes(r: Router): void {
     return { ok: true, busySchedule: generated.busySchedule };
   });
 
+  // Рассылка (только userbot-режим)
+  r.post("/api/profiles/:slug/broadcast", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    if (cfg.mode !== "userbot") throw new HttpError(400, "broadcast available only in userbot mode");
+    const rt = bus.get(slug);
+    if (!rt) throw new HttpError(400, "runtime not running — start the agent first");
+    const data = body as { recipients?: unknown; text?: string; forwardFromChannelMsgId?: unknown };
+    if (!Array.isArray(data?.recipients) || data.recipients.length === 0) throw new HttpError(400, "recipients must be a non-empty array");
+    const recipients = (data.recipients as unknown[]).map(Number).filter(n => Number.isInteger(n) && n !== 0);
+    if (recipients.length === 0) throw new HttpError(400, "no valid recipients");
+    const hasText = typeof data.text === "string" && data.text.trim().length > 0;
+    const hasFwd = data.forwardFromChannelMsgId !== undefined && Number.isInteger(Number(data.forwardFromChannelMsgId)) && Number(data.forwardFromChannelMsgId) > 0;
+    if (!hasText && !hasFwd) throw new HttpError(400, "text or forwardFromChannelMsgId required");
+    if (hasText && hasFwd) throw new HttpError(400, "provide either text or forwardFromChannelMsgId, not both");
+    if (hasFwd && !(cfg as unknown as Record<string, unknown>).photoChannelId) throw new HttpError(400, "photoChannelId not configured in profile — cannot forward");
+    const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const payload = hasText
+      ? { text: data.text!.trim() }
+      : { forwardFromChannelId: Number((cfg as unknown as Record<string, unknown>).photoChannelId), forwardMsgId: Number(data.forwardFromChannelMsgId) };
+    rt.startBroadcast(jobId, recipients, payload);
+    return { jobId, total: recipients.length };
+  });
+
+  r.get("/api/profiles/:slug/broadcast/:jobId", async ({ params }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const rt = bus.get(slug);
+    if (!rt) throw new HttpError(400, "runtime not running");
+    const job = rt.getBroadcastJob(params.jobId ?? "");
+    if (!job) throw new HttpError(404, "job not found");
+    return job;
+  });
+
   // Диалоги (только userbot-режим)
   r.get("/api/profiles/:slug/dialogs", async ({ params }) => {
     const slug = params.slug ?? "";
