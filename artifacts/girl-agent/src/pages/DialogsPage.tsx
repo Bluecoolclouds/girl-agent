@@ -3,6 +3,8 @@ import { useStore } from "../lib/store";
 import { api, type DialogEntry } from "../lib/api";
 import { BroadcastPanel } from "../components/BroadcastPanel";
 
+type ReengageState = "idle" | "loading" | "done" | "error";
+
 function formatDate(ms: number): string {
   if (!ms) return "—";
   const d = new Date(ms);
@@ -33,7 +35,21 @@ export function DialogsPage() {
   const [silentFilter, setSilentFilter] = useState<number | null>(null);
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [page, setPage] = useState(0);
+  const [reengageStates, setReengageStates] = useState<Map<number, ReengageState>>(new Map());
   const PAGE_SIZE = 50;
+
+  const reengage = async (chatId: number) => {
+    if (!cfg) return;
+    setReengageStates(prev => new Map(prev).set(chatId, "loading"));
+    try {
+      await api.reengage(cfg.slug, chatId);
+      setReengageStates(prev => new Map(prev).set(chatId, "done"));
+      toast(`Запланировано для ${chatId}`, "success");
+    } catch (e) {
+      setReengageStates(prev => new Map(prev).set(chatId, "error"));
+      toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    }
+  };
 
   useEffect(() => {
     setDialogs([]);
@@ -186,6 +202,7 @@ export function DialogsPage() {
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}>Последнее сообщение</th>
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}>Дата</th>
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}>Кто</th>
+                  <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -226,6 +243,23 @@ export function DialogsPage() {
                         {d.lastMessageOutgoing
                           ? <span style={{ color: "var(--ga-accent)" }}>↑ она</span>
                           : <span style={{ color: "var(--ga-text-dim)" }}>↓ он</span>}
+                      </td>
+                      <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
+                        {(() => {
+                          const state = reengageStates.get(d.chatId) ?? "idle";
+                          if (state === "done") return <span style={{ fontSize: 11, color: "var(--ga-accent)" }}>✓ запланировано</span>;
+                          if (state === "error") return <span style={{ fontSize: 11, color: "var(--ga-error)" }}>ошибка</span>;
+                          return (
+                            <button
+                              className="btn tiny"
+                              disabled={state === "loading"}
+                              onClick={() => void reengage(d.chatId)}
+                              title="Поставить в очередь проактивное сообщение"
+                            >
+                              {state === "loading" ? "…" : "Написать"}
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

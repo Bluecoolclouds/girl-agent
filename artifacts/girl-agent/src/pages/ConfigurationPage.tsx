@@ -300,6 +300,29 @@ export function ConfigurationPage() {
       </div>
 
 
+      <div className="card">
+        <div className="card-header">
+          <div className="h-title">Авто ре-энгейджмент</div>
+          <div className="h-meta">только userbot</div>
+        </div>
+        <div className="form-row">
+          <label>Порог молчания (дней): {(merged as any).reengageAfterDays ?? 0}</label>
+          <input
+            type="range"
+            className="range"
+            min={0}
+            max={30}
+            value={(merged as any).reengageAfterDays ?? 0}
+            onChange={e => pf("reengageAfterDays" as any, Number(e.target.value))}
+          />
+          <div className="hint">
+            {((merged as any).reengageAfterDays ?? 0) === 0
+              ? "Выключено. Поставь > 0 чтобы агент раз в сутки сам писал молчащим контактам."
+              : `Агент будет писать тем кто молчит дольше ${(merged as any).reengageAfterDays} дней (не более 10 в сутки). Сообщение генерирует LLM по персонажу и истории.`}
+          </div>
+        </div>
+      </div>
+
       <div className="card" style={{ borderColor: "rgba(255, 122, 140, 0.3)" }}>
         <div className="card-header">
           <div className="h-title" style={{ color: "var(--ga-error)" }}>Опасная зона</div>

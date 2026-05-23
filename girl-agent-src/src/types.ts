@@ -155,6 +155,8 @@ export interface ProfileConfig {
   photoChannelId?: string;
   /** Пригласительная ссылка на закрытый канал с платным контентом (https://t.me/+...) */
   photoChannelLink?: string;
+  /** Авто ре-энгейджмент: если > 0, агент раз в сутки пишет тем кто молчит дольше N дней (не более 10 за сутки). 0 = выключено. */
+  reengageAfterDays?: number;
 }
 
 export interface RelationshipScore {

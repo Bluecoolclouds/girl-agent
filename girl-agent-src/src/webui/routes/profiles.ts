@@ -449,6 +449,21 @@ export function registerProfileRoutes(r: Router): void {
     return job;
   });
 
+  // Ре-энгейджмент (только userbot-режим)
+  r.post("/api/profiles/:slug/reengage", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    if (cfg.mode !== "userbot") throw new HttpError(400, "reengage available only in userbot mode");
+    const rt = bus.get(slug);
+    if (!rt) throw new HttpError(400, "runtime not running — start the agent first");
+    const data = body as { chatId?: number };
+    const chatId = data?.chatId;
+    if (!chatId || !Number.isInteger(chatId)) throw new HttpError(400, "chatId required (integer)");
+    await rt.triggerReengage(chatId);
+    return { scheduled: true };
+  });
+
   // Диалоги (только userbot-режим)
   r.get("/api/profiles/:slug/dialogs", async ({ params }) => {
     const slug = params.slug ?? "";

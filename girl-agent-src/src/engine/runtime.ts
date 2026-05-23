@@ -6,7 +6,8 @@ import { behaviorTick } from "./behavior-tick.js";
 import { applyMoodDelta, maybeReflect } from "./reflect.js";
 import {
   appendSessionLog, appendSharedMemory, readRelationship, writeRelationship, writeConfig, writeMd,
-  readAgenda, writeAgenda, readRecentSessionTurns, readMd, sessionDate, normalizeOwnerId, profileDir
+  readAgenda, writeAgenda, readRecentSessionTurns, readMd, sessionDate, normalizeOwnerId, profileDir,
+  type AgendaItem
 } from "../storage/md.js";
 import { findStage } from "../presets/stages.js";
 import { communicationProfileLabel, normalizeCommunicationProfile } from "../presets/communication.js";
@@ -84,6 +85,7 @@ export class Runtime extends EventEmitter {
   private dailyLife?: DailyLife;
   private dailyLifeDate?: string;
   private lastStage?: string;
+  private lastAutoReengageDate?: string;
   /** Mapping firedItemId -> chatId where ping was sent, для определения её proactive-сообщения и обработки ответа. */
   private pendingProactive = new Map<string, { itemId: string; about: string; sentAt: number }>();
   private lastUserMsgTs = new Map<string, number>();
@@ -619,6 +621,59 @@ export class Runtime extends EventEmitter {
     if (made > 0) this.emit("event", { type: "info", text: `daily summaries: +${made}` } as RuntimeEvent);
     const mined = await mineUnminedDailyLogs(this.llm, this.cfg, 2).catch(() => 0);
     if (mined > 0) this.emit("event", { type: "info", text: `memory palace drawers: +${mined}` } as RuntimeEvent);
+    // Авто ре-энгейджмент: раз в сутки
+    if (today !== this.lastAutoReengageDate) {
+      await this.autoReengage(today).catch(e => {
+        this.emit("event", { type: "error", text: `auto-reengage: ${(e as Error).message}` } as RuntimeEvent);
+      });
+    }
+  }
+
+  private async autoReengage(today: string): Promise<void> {
+    const threshold = this.cfg.reengageAfterDays ?? 0;
+    if (threshold <= 0) return;
+    if (this.cfg.mode !== "userbot") return;
+    if (!this.tg.getDialogs) return;
+    this.lastAutoReengageDate = today;
+    // Проверяем и восстанавливаем дневной счётчик из диска (устойчиво к рестартам)
+    const capFile = `time/reengage-${today}.txt`;
+    const capRaw = (await readMd(this.cfg.slug, capFile)).trim();
+    let pingedToday = capRaw ? parseInt(capRaw, 10) || 0 : 0;
+    const MAX_PER_DAY = 10;
+    if (pingedToday >= MAX_PER_DAY) return;
+    const dialogs = await this.tg.getDialogs();
+    const thresholdMs = threshold * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const dialog of dialogs) {
+      if (pingedToday >= MAX_PER_DAY) break;
+      const chatId = dialog.chatId;
+      if (!chatId || !Number.isInteger(chatId)) continue;
+      // Только приватные чаты с реальными пользователями — не группы/каналы
+      if (dialog.isUser === false) continue;
+      // Пропускаем заблокированные контакты
+      if (dialog.blocked) continue;
+      // Пропускаем primary owner
+      if (chatId === this.cfg.ownerId) continue;
+      // Проверяем молчание (lastMessageDate уже в миллисекундах)
+      const lastMsgMs = dialog.lastMessageDate ?? 0;
+      if (!lastMsgMs || now - lastMsgMs < thresholdMs) continue;
+      // Проверяем стадию контакта — не пишем dumped
+      const rel = await readRelationship(this.cfg.slug, chatId).catch(() => null);
+      if (rel?.stage === "dumped") continue;
+      // Проверяем не пинговали ли сегодня (per-contact)
+      const reengageFile = `contacts/${chatId}/reengage.txt`;
+      const lastPingDay = (await readMd(this.cfg.slug, reengageFile)).trim();
+      if (lastPingDay === today) continue;
+      // Ставим в agenda и только потом сохраняем дату (чтобы не пропустить при ошибке)
+      await this.triggerReengage(chatId);
+      await writeMd(this.cfg.slug, reengageFile, today);
+      pingedToday++;
+      // Персистируем дневной счётчик сразу после каждого пинга
+      await writeMd(this.cfg.slug, capFile, String(pingedToday));
+    }
+    if (pingedToday > 0) {
+      this.emit("event", { type: "info", text: `auto-reengage: запланировано ${pingedToday} пингов (порог ${threshold} дней)` } as RuntimeEvent);
+    }
   }
 
   /**
@@ -1255,6 +1310,44 @@ export class Runtime extends EventEmitter {
   async getDialogs() {
     if (!this.tg.getDialogs) throw new Error("getDialogs не поддерживается в bot-режиме");
     return this.tg.getDialogs();
+  }
+
+  async triggerReengage(chatId: number): Promise<void> {
+    // Не пишем контактам в стадии dumped
+    const contactRel = await readRelationship(this.cfg.slug, chatId).catch(() => null);
+    if (contactRel?.stage === "dumped") {
+      this.emit("event", { type: "info", text: `reengage: пропущен chatId=${chatId} (стадия dumped)` } as RuntimeEvent);
+      return;
+    }
+    const key = this.histKey(chatId);
+    await this.historyFor(key, chatId, chatId === this.cfg.ownerId);
+    const items = await readAgenda(this.cfg.slug);
+    const hasAlready = items.some(it =>
+      String(it.chatId) === String(chatId) &&
+      it.state === "pending" &&
+      it.about === "ре-энгейджмент"
+    );
+    if (hasAlready) {
+      this.emit("event", { type: "info", text: `reengage: для chatId=${chatId} уже есть pending ping` } as RuntimeEvent);
+      return;
+    }
+    const delayMs = 60_000 + Math.floor(Math.random() * 60_000);
+    const pingAt = new Date(Date.now() + delayMs).toISOString();
+    const newItem: AgendaItem = {
+      id: `reengage-${chatId}-${Date.now().toString(36)}`,
+      about: "ре-энгейджмент",
+      reason: "давно не писали — соскучилась, хочет узнать как дела",
+      importance: 2,
+      pingAt,
+      state: "pending",
+      attempts: 0,
+      chatId,
+      createdAt: new Date().toISOString()
+    };
+    items.push(newItem);
+    await writeAgenda(this.cfg.slug, items);
+    await appendSessionLog(this.cfg.slug, this.cfg.tz, `[${new Date().toISOString()}] [reengage] запланировано сообщение → chatId=${chatId} в ${pingAt}`, chatId);
+    this.emit("event", { type: "info", text: `reengage: запланировано для chatId=${chatId} (~${Math.round(delayMs / 60000)} мин)` } as RuntimeEvent);
   }
 
   getBroadcastJob(jobId: string) {

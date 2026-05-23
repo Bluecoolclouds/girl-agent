@@ -520,7 +520,9 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         const lastMessageText = String(msg?.message ?? msg?.action?.className ?? "").slice(0, 300);
         const lastMessageDate = Number(msg?.date ?? 0) * 1000;
         const lastMessageOutgoing = Boolean(msg?.out);
-        results.push({ chatId, name, username, lastMessageText, lastMessageDate, lastMessageOutgoing });
+        const isUser = className === "User";
+        const blocked = Boolean(entity.blocked);
+        results.push({ chatId, name, username, lastMessageText, lastMessageDate, lastMessageOutgoing, isUser, blocked });
       }
       return results;
     },

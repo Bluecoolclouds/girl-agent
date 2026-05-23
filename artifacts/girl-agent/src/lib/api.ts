@@ -24,6 +24,7 @@ export interface ProfileConfig {
   personaNotes?: string;
   busySchedule?: { dayOfWeek: number; startHour: number; endHour: number; reason?: string }[];
   photoChannelId?: string;
+  reengageAfterDays?: number;
 }
 
 export interface LLMPreset {
@@ -260,6 +261,10 @@ export const api = {
     return req<{ dialogs: DialogEntry[] }>("GET", `/api/profiles/${encodeURIComponent(slug)}/dialogs`);
   },
 
+  async reengage(slug: string, chatId: number) {
+    return req<{ scheduled: boolean }>("POST", `/api/profiles/${encodeURIComponent(slug)}/reengage`, { chatId });
+  },
+
   async startBroadcast(slug: string, payload: { recipients: number[]; text?: string; forwardFromChannelMsgId?: number }) {
     return req<{ jobId: string; total: number }>("POST", `/api/profiles/${encodeURIComponent(slug)}/broadcast`, payload);
   },
@@ -278,6 +283,8 @@ export interface DialogEntry {
   lastMessageText: string;
   lastMessageDate: number;
   lastMessageOutgoing: boolean;
+  isUser?: boolean;
+  blocked?: boolean;
 }
 
 export interface PhotoEntry {
