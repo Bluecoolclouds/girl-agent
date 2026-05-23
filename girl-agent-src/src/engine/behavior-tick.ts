@@ -211,7 +211,7 @@ export async function behaviorTick(
         bubbles: 1,
         typing: result.typing ?? true,
         ignoreReason: undefined,
-        moodDelta: result.moodDelta || { annoyance: 3 },
+        moodDelta: sanitizeMoodDelta(result.moodDelta || { annoyance: 3 }, !!ctx.isAcquaintance),
         intent: "short",
         reaction: undefined
       };
@@ -268,7 +268,7 @@ export async function behaviorTick(
       bubbles,
       typing: parsed.typing ?? true,
       ignoreReason: parsed.ignoreReason || undefined,
-      moodDelta: parsed.moodDelta || {},
+      moodDelta: sanitizeMoodDelta(parsed.moodDelta || {}, !!ctx.isAcquaintance),
       intent,
       reaction,
       reactionTargetMessageId: reaction ? reactionTargetMessageId : undefined
@@ -384,4 +384,24 @@ function normalizeBubbles(value: number, profile: CommunicationProfile, intent: 
 
 function clamp(n: number, a: number, b: number): number {
   return Math.max(a, Math.min(b, Number(n) || 0));
+}
+
+function sanitizeMoodDelta(
+  delta: Partial<Record<string, number>>,
+  isAcquaintance: boolean
+): Partial<Record<string, number>> {
+  const keys = ["interest", "trust", "attraction", "annoyance", "cringe"] as const;
+  const result: Partial<Record<string, number>> = {};
+  for (const key of keys) {
+    if (!(key in delta)) continue;
+    const raw = Number(delta[key]) || 0;
+    if (isAcquaintance && (key === "annoyance" || key === "cringe")) {
+      result[key] = clamp(raw, -5, 5);
+    } else if (key === "annoyance" || key === "cringe") {
+      result[key] = clamp(raw, -10, 10);
+    } else {
+      result[key] = clamp(raw, -10, 10);
+    }
+  }
+  return result;
 }
