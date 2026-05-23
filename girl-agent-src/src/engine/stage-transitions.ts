@@ -37,19 +37,43 @@ export interface StageTransitionResult {
   direction: "up" | "down";
 }
 
-/** Ключевые фразы явного интереса к покупке/контенту (RU + транслит). */
-const INTENT_PATTERNS = [
-  /сколько стоит/i, /как купить/i, /хочу купить/i, /готов купить/i,
-  /хочу посмотреть/i, /как оплатить/i, /где купить/i, /есть ссылка/i,
-  /скинь ссылку/i, /как подписаться/i, /хочу доступ/i, /дай ссылку/i,
-  /покажи фото/i, /покажи видео/i, /скинь фото/i, /скинь видео/i,
-  /пришли фото/i, /пришли видео/i, /хочу увидеть/i, /хочу посмотреть/i,
+/**
+ * SOFT CLOSE — ценовой интерес/любопытство к контенту.
+ * Сигнал: человек интересуется, но ещё не сказал "куплю прямо сейчас".
+ * Действие: переход на стадию 4 (convinced) — тизеринг, интрига, подводка к цене.
+ */
+const SOFT_CLOSE_PATTERNS = [
+  /сколько стоит/i, /как купить/i, /где купить/i, /как оплатить/i,
+  /сколько берёшь/i, /сколько берешь/i,
   /есть of\b/i, /есть онли/i, /onlyfans/i, /boosty/i,
-  /готов платить/i, /сколько берёшь/i, /сколько берешь/i,
+  /как подписаться/i,
+  /покажи фото/i, /покажи видео/i, /скинь фото/i, /скинь видео/i,
+  /пришли фото/i, /пришли видео/i, /хочу посмотреть/i, /хочу увидеть/i,
 ];
 
+/**
+ * HARD CLOSE — явная готовность купить прямо сейчас.
+ * Сигнал: человек говорит "куплю", "готов платить", "дай ссылку".
+ * Действие: переход на стадию 5 (first-date-done) — закрываем сделку немедленно.
+ */
+const HARD_CLOSE_PATTERNS = [
+  /готов платить/i, /готов купить/i, /хочу купить/i,
+  /хочу доступ/i, /дай ссылку/i, /скинь ссылку/i, /есть ссылка/i,
+  /куплю\b/i, /покупаю\b/i, /беру\b/i,
+  /давай куплю/i, /хочу купить/i, /хочу приобрести/i,
+];
+
+export function hasSoftCloseIntent(text: string): boolean {
+  return SOFT_CLOSE_PATTERNS.some(p => p.test(text));
+}
+
+export function hasHardCloseIntent(text: string): boolean {
+  return HARD_CLOSE_PATTERNS.some(p => p.test(text));
+}
+
+/** Любой сигнал покупки (soft или hard) — для обхода порога сообщений. */
 export function hasPurchaseIntent(text: string): boolean {
-  return INTENT_PATTERNS.some(p => p.test(text));
+  return hasSoftCloseIntent(text) || hasHardCloseIntent(text);
 }
 
 const STAGE_ORDER: StageId[] = [
@@ -74,11 +98,27 @@ export function decideStageTransition(ctx: StageTransitionContext): StageTransit
   const idx = stageIndex(ctx.currentStage);
   if (idx < 0) return null;
 
-  // Intent jump: явный сигнал покупки на холодных стадиях → сразу на "горячий"
-  if (ctx.intentJumpEnabled && ctx.lastIncomingText && hasPurchaseIntent(ctx.lastIncomingText)) {
-    const coldStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming", "convinced"];
-    if (coldStages.includes(ctx.currentStage)) {
-      return { next: "first-date-done", reason: "intent-jump: явный сигнал покупки", direction: "up" };
+  // Intent jump: двухступенчатый — hard close или soft close
+  if (ctx.intentJumpEnabled && ctx.lastIncomingText) {
+    const text = ctx.lastIncomingText;
+
+    // HARD CLOSE: "готов платить", "дай ссылку", "хочу купить" и т.п.
+    // Стадии 1-4 → сразу first-date-done (закрываем сделку немедленно)
+    if (hasHardCloseIntent(text)) {
+      const hardStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming", "convinced"];
+      if (hardStages.includes(ctx.currentStage)) {
+        return { next: "first-date-done", reason: "hard-close: готов купить прямо сейчас", direction: "up" };
+      }
+    }
+
+    // SOFT CLOSE: "сколько стоит", "покажи фото", "есть onlyfans" и т.п.
+    // Стадии 1-3 → convinced (стадия 4): начинаем тизеринг и подводку к цене
+    // Стадия 4 — уже там, не трогаем
+    if (hasSoftCloseIntent(text)) {
+      const preConvincedStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming"];
+      if (preConvincedStages.includes(ctx.currentStage)) {
+        return { next: "convinced", reason: "soft-close: интерес к контенту/цене", direction: "up" };
+      }
     }
   }
 
