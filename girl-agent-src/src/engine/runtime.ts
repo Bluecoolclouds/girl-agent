@@ -296,10 +296,12 @@ export class Runtime extends EventEmitter {
     this.emit("event", { type: "info", text: `primary owner сменён после dumped: ${oldOwnerId} → ${fromId}` } as RuntimeEvent);
   }
 
-  private async historyFor(key: string, fromId?: number, restore = false): Promise<ConversationTurn[]> {
+  private async historyFor(key: string, fromId?: number, isPrimary = false): Promise<ConversationTurn[]> {
     const existing = this.histories.get(key);
     if (existing) return existing;
-    const restored = restore ? await readRecentSessionTurns(this.cfg.slug, this.cfg.tz, fromId, 40) : [];
+    // Primary owner gets up to 40 turns for richer continuity; subscribers get 20 to bound memory.
+    const limit = isPrimary ? 40 : 20;
+    const restored = await readRecentSessionTurns(this.cfg.slug, this.cfg.tz, fromId, limit);
     const hist = restored.map(t => ({ role: t.role, content: t.content, ts: t.ts }));
     this.histories.set(key, hist);
     this.hydratePresenceTrackers(key, hist);
@@ -321,7 +323,6 @@ export class Runtime extends EventEmitter {
         this.lastHerReplyTs.delete(key);
         this.exchangeCount.delete(key);
         this.incomingMsgIds.delete(key);
-        this.stageStats.delete(key);
         this.lastDecision.delete(key);
         this.lastEmojiReactionByKey.delete(key);
         this.incomingSeq.delete(key);
