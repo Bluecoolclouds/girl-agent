@@ -153,6 +153,10 @@ export class Runtime extends EventEmitter {
       this.sentMessages = this.sentMessages.filter(m => m.ts >= cutoff);
     }, 15 * 60 * 1000).unref?.();
 
+    // TTL-эвикция in-memory истории чатов — очищаем чаты неактивные >90 минут.
+    // Без этого Map растёт бесконечно при большом числе подписчиков.
+    setInterval(() => this.evictStaleHistories(), 15 * 60 * 1000).unref?.();
+
     // запускаем agenda-scheduler (раз в 60с проверяет due items)
     this.agendaTimer = setInterval(() => this.tickAgenda().catch(e =>
       this.emit("event", { type: "error", text: "agenda tick: " + (e as Error).message } as RuntimeEvent)
@@ -295,11 +299,42 @@ export class Runtime extends EventEmitter {
   private async historyFor(key: string, fromId?: number, restore = false): Promise<ConversationTurn[]> {
     const existing = this.histories.get(key);
     if (existing) return existing;
-    const restored = restore ? await readRecentSessionTurns(this.cfg.slug, this.cfg.tz, fromId, 80) : [];
+    const restored = restore ? await readRecentSessionTurns(this.cfg.slug, this.cfg.tz, fromId, 40) : [];
     const hist = restored.map(t => ({ role: t.role, content: t.content, ts: t.ts }));
     this.histories.set(key, hist);
     this.hydratePresenceTrackers(key, hist);
     return hist;
+  }
+
+  private evictStaleHistories(): void {
+    const TTL_MS = 90 * 60 * 1000;
+    const cutoff = Date.now() - TTL_MS;
+    let evicted = 0;
+    for (const key of this.histories.keys()) {
+      if (this.pendingReplyTimers.has(key)) continue;
+      const lastUser = this.lastUserMsgTs.get(key) ?? 0;
+      const lastHer = this.lastHerReplyTs.get(key) ?? 0;
+      const lastActivity = Math.max(lastUser, lastHer);
+      if (lastActivity > 0 && lastActivity < cutoff) {
+        this.histories.delete(key);
+        this.lastUserMsgTs.delete(key);
+        this.lastHerReplyTs.delete(key);
+        this.exchangeCount.delete(key);
+        this.incomingMsgIds.delete(key);
+        this.stageStats.delete(key);
+        this.lastDecision.delete(key);
+        this.lastEmojiReactionByKey.delete(key);
+        this.incomingSeq.delete(key);
+        this.lastSentByChat.delete(key);
+        this.pendingReplyIncoming.delete(key);
+        this.pendingReplySeq.delete(key);
+        this.pendingReplyDueAt.delete(key);
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      this.emit("event", { type: "info", text: `history-evict: очищено ${evicted} неактивных чатов из памяти` } as RuntimeEvent);
+    }
   }
 
   private hydratePresenceTrackers(key: string, hist: ConversationTurn[]): void {
