@@ -1208,9 +1208,9 @@ export class Runtime extends EventEmitter {
     const bubbles = dedupeBubbles(smartSplitBubbles(cleanedReply, tick.bubbles || 1)).slice(0, Math.max(tick.bubbles || 1, 1));
     const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing, replyToMessageId);
     if (!sent.length) {
-      // Все пузыри были дублями — не молчим, отправляем нейтральный филлер.
-      this.emit("event", { type: "info", text: "все пузыри — дубли, отправляю нейтральный филлер", chatId } as RuntimeEvent);
-      await this.sendNeutralFiller(chatId, hist, scope, tick.typing);
+      // Все пузыри были дублями — ответ уже был ранее, тихо игнорируем.
+      this.emit("event", { type: "info", text: "все пузыри — дубли, silent fallback", chatId } as RuntimeEvent);
+      await this.sendSafeFallback(chatId, hist, scope, "all-bubbles-duplicate");
       return;
     }
     this.setDecisionStatus(this.histKey(chatId), "sent");
