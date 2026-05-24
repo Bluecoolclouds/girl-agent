@@ -200,6 +200,7 @@ export const api = {
   async listStickers(slug: string) { return req<{ stickers: { fileId: string; emoji?: string; tags?: string[] }[] }>("GET", `/api/profiles/${slug}/stickers`); },
   async deleteSticker(slug: string, fileId: string) { return req<{ ok: true }>("DELETE", `/api/profiles/${slug}/stickers/${encodeURIComponent(fileId)}`); },
   async toggleSticker(slug: string, fileId: string, enabled: boolean) { return req<{ ok: true }>("PATCH", `/api/profiles/${slug}/stickers/${encodeURIComponent(fileId)}`, { enabled }); },
+  async importSavedStickers(slug: string, limit = 300) { return req<{ found: number; added: number }>("POST", `/api/profiles/${slug}/stickers/import-saved`, { limit }); },
 
   async getVersion() { return req<{ current: string; latest: string | null; commit?: string }>("GET", "/api/system/version"); },
   async getDiagnostics() { return req<{ platform: string; arch: string; node: string; hostname: string; uptime: number; dataRoot: string; ipv4: string[]; memTotalMB: number }>("GET", "/api/system/diagnostics"); },

@@ -1343,6 +1343,11 @@ export class Runtime extends EventEmitter {
     return this.tg.getDialogs();
   }
 
+  async scanSavedStickers(limit = 200): Promise<{ fileId: string; emoji?: string }[]> {
+    if (!this.tg.scanSavedStickers) throw new Error("scanSavedStickers не поддерживается в bot-режиме");
+    return this.tg.scanSavedStickers(limit);
+  }
+
   async triggerReengage(chatId: number): Promise<void> {
     // Не пишем контактам в стадии dumped
     const contactRel = await readRelationship(this.cfg.slug, chatId).catch(() => null);

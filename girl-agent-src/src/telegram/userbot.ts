@@ -526,6 +526,27 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       }
       return results;
     },
+    async scanSavedStickers(limit: number): Promise<{ fileId: string; emoji?: string }[]> {
+      const me = await client.getMe();
+      const results: { fileId: string; emoji?: string }[] = [];
+      for await (const msg of client.iterMessages(me, { limit })) {
+        const m = msg as Api.Message;
+        if (!m.media) continue;
+        const doc = (m.media as any)?.document;
+        if (!doc) continue;
+        const attrs = doc?.attributes ?? [];
+        const isSticker = attrs.some((a: any) => a.className === "DocumentAttributeSticker");
+        if (!isSticker) continue;
+        const stickerAttr = attrs.find((a: any) => a.className === "DocumentAttributeSticker");
+        const emoji: string | undefined = stickerAttr?.alt ?? undefined;
+        const fileRef = doc.fileReference
+          ? Buffer.from(doc.fileReference as Buffer).toString("base64")
+          : "";
+        const fileId = `gramjs:${String(doc.id)}:${String(doc.accessHash)}:${fileRef}`;
+        results.push({ fileId, emoji });
+      }
+      return results;
+    },
     async stop() {
       await client.disconnect();
     }

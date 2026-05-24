@@ -13,6 +13,7 @@ export function StickersPage() {
   const toast = useStore(s => s.toast);
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function load() {
     if (!cfg) return;
@@ -39,6 +40,20 @@ export function StickersPage() {
       }));
     } catch (e) {
       toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    }
+  }
+
+  async function importFromSaved() {
+    if (!cfg) return;
+    setImporting(true);
+    try {
+      const r = await api.importSavedStickers(cfg.slug, 300);
+      toast(`Готово: найдено ${r.found}, добавлено ${r.added}`, "success");
+      await load();
+    } catch (e) {
+      toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -71,9 +86,18 @@ export function StickersPage() {
         <div className="card-header">
           <div className="h-title">Библиотека стикеров</div>
           <div className="h-meta">{stickers.length} стикеров · {own.filter(s => !s.tags?.includes("disabled")).length} активных</div>
+          <button
+            className="btn btn-accent"
+            style={{ marginLeft: "auto", padding: "5px 14px", fontSize: 13 }}
+            onClick={() => void importFromSaved()}
+            disabled={importing}
+          >
+            {importing ? "Сканирую…" : "⬇ Из Избранного"}
+          </button>
         </div>
         <div className="hint">
-          Стикеры которые бот может отправлять (8% шанс после ответа). Полученные от собеседников никогда не отправляются. Добавить стикер: напиши <code>:sticker add</code> в командной строке.
+          Стикеры которые бот может отправлять (8% шанс после ответа). Полученные от собеседников никогда не отправляются.<br />
+          <strong>Из Избранного</strong> — сканирует последние 300 сообщений в «Saved Messages» и добавляет найденные стикеры. Только userbot-режим, агент должен быть запущен.
         </div>
       </div>
 

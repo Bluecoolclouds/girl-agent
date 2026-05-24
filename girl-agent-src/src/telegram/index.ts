@@ -84,6 +84,8 @@ export interface TgAdapter {
   iterChannelMedia?(channelId: string, limit: number): AsyncIterable<{ id: number; type: "photo" | "video"; caption: string }>;
   /** Возвращает список диалогов юзербота (только userbot-режим, bot API не поддерживает). */
   getDialogs?(): Promise<DialogEntry[]>;
+  /** Сканирует «Избранное» (Saved Messages) и возвращает стикеры оттуда. Только userbot. */
+  scanSavedStickers?(limit: number): Promise<{ fileId: string; emoji?: string }[]>;
   stop(): Promise<void>;
 }
 

@@ -520,6 +520,28 @@ export function registerProfileRoutes(r: Router): void {
     return { ok: true };
   });
 
+  r.post("/api/profiles/:slug/stickers/import-saved", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    if (cfg.mode !== "userbot") throw new HttpError(400, "import-saved работает только в userbot-режиме");
+    const rt = bus.get(slug);
+    if (!rt) throw new HttpError(400, "агент не запущен — сначала запустите его");
+    const limit = Number((body as any)?.limit ?? 300);
+    const found = await rt.scanSavedStickers(limit);
+    const { addStickerToLibrary } = await import("../../engine/stickers.js");
+    let added = 0;
+    for (const s of found) {
+      const before = (await import("../../engine/stickers.js")).listStickers;
+      const existing = await before(cfg);
+      if (!existing.some(e => e.fileId === s.fileId)) {
+        await addStickerToLibrary(cfg, s.fileId, s.emoji ?? "", []);
+        added++;
+      }
+    }
+    return { found: found.length, added };
+  });
+
   // Diagnostics: which preset id? get the list
   r.get("/api/presets/llm-detect", async ({ searchParams }) => {
     const id = searchParams.get("id") ?? "";
