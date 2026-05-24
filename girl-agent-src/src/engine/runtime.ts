@@ -700,7 +700,7 @@ export class Runtime extends EventEmitter {
       const lastPingDay = (await readMd(this.cfg.slug, reengageFile)).trim();
       if (lastPingDay === today) continue;
       // Ставим в agenda и только потом сохраняем дату (чтобы не пропустить при ошибке)
-      await this.triggerReengage(chatId);
+      await this.triggerReengage(chatId, dialog.lastMessageText || undefined);
       await writeMd(this.cfg.slug, reengageFile, today);
       pingedToday++;
       // Персистируем дневной счётчик сразу после каждого пинга
@@ -773,7 +773,9 @@ export class Runtime extends EventEmitter {
       await this.switchPrimaryAfterDumped(m.fromId);
       await this.ensureOwner(m.fromId);
       const isPrimary = this.isPrimaryFrom(m.fromId);
-      if (!isPrimary && !this.strangersAllowed()) {
+      // Если мы сами написали этому человеку proactively — пропускаем его ответ даже в privacy-режиме
+      const hasRecentProactive = this.pendingProactive.has(this.histKey(m.chatId));
+      if (!isPrimary && !this.strangersAllowed() && !hasRecentProactive) {
         this.emit("event", { type: "ignored", text: m.text, chatId: m.chatId, reason: "privacy-owner-only" } as RuntimeEvent);
         return;
       }
@@ -1360,7 +1362,7 @@ export class Runtime extends EventEmitter {
     return this.tg.scanSavedStickers(limit);
   }
 
-  async triggerReengage(chatId: number): Promise<void> {
+  async triggerReengage(chatId: number, lastMessageHint?: string): Promise<void> {
     // Не пишем контактам в стадии dumped
     const contactRel = await readRelationship(this.cfg.slug, chatId).catch(() => null);
     if (contactRel?.stage === "dumped") {
@@ -1381,10 +1383,13 @@ export class Runtime extends EventEmitter {
     }
     const delayMs = 60_000 + Math.floor(Math.random() * 60_000);
     const pingAt = new Date(Date.now() + delayMs).toISOString();
+    const reason = lastMessageHint
+      ? `давно не писали. Последнее его сообщение было: "${lastMessageHint.slice(0, 120)}". Напиши первой — коротко, живо, без "привет как дела". Зацепись за что-то конкретное из прошлого или брось свою мысль/новость.`
+      : "давно не писали — напиши первой, коротко и живо, без шаблонного привет-как-дела";
     const newItem: AgendaItem = {
       id: `reengage-${chatId}-${Date.now().toString(36)}`,
       about: "ре-энгейджмент",
-      reason: "давно не писали — соскучилась, хочет узнать как дела",
+      reason,
       importance: 2,
       pingAt,
       state: "pending",
