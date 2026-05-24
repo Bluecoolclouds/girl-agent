@@ -700,7 +700,9 @@ export class Runtime extends EventEmitter {
       const lastPingDay = (await readMd(this.cfg.slug, reengageFile)).trim();
       if (lastPingDay === today) continue;
       // Ставим в agenda и только потом сохраняем дату (чтобы не пропустить при ошибке)
-      await this.triggerReengage(chatId, dialog.lastMessageText || undefined);
+      // Только входящее последнее сообщение годится как контекст — outgoing бесполезен
+      const lastIncomingHint = !dialog.lastMessageOutgoing ? (dialog.lastMessageText || undefined) : undefined;
+      await this.triggerReengage(chatId, lastIncomingHint);
       await writeMd(this.cfg.slug, reengageFile, today);
       pingedToday++;
       // Персистируем дневной счётчик сразу после каждого пинга
