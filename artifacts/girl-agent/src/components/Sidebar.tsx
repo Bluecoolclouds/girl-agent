@@ -10,6 +10,7 @@ const ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "configuration", label: "Конфигурация", icon: "⚙" },
   { id: "memory", label: "Память", icon: "❀" },
   { id: "media", label: "Медиатека", icon: "◈" },
+  { id: "stickers", label: "Стикеры", icon: "◇" },
   { id: "addons", label: "Аддоны", icon: "◉" },
   { id: "diagnostics", label: "Диагностика", icon: "✓" }
 ];

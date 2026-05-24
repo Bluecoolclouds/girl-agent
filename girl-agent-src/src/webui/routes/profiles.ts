@@ -476,6 +476,50 @@ export function registerProfileRoutes(r: Router): void {
     return { dialogs };
   });
 
+  // Sticker library management
+  r.get("/api/profiles/:slug/stickers", async ({ params }) => {
+    const slug = params.slug ?? "";
+    if (!await readConfig(slug)) throw new HttpError(404, "profile not found");
+    const { listStickers } = await import("../../engine/stickers.js");
+    const cfg = await readConfig(slug);
+    const stickers = await listStickers(cfg!);
+    return { stickers };
+  });
+
+  r.delete("/api/profiles/:slug/stickers/:fileId", async ({ params }) => {
+    const slug = params.slug ?? "";
+    const fileId = decodeURIComponent(params.fileId ?? "");
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const { listStickers } = await import("../../engine/stickers.js");
+    const all = await listStickers(cfg);
+    const kept = all.filter(s => s.fileId !== fileId);
+    const header = "# sticker library\n# Добавляй по одному file_id на строку:\n# CAACAgIAAxkBAA... | 😂 | laugh,funny\n";
+    const lines = kept.map(s => `${s.fileId} | ${s.emoji ?? ""} | ${(s.tags ?? []).join(",")}`);
+    await writeMd(slug, "stickers/library.md", header + lines.join("\n") + (lines.length ? "\n" : ""));
+    return { ok: true };
+  });
+
+  r.patch("/api/profiles/:slug/stickers/:fileId", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const fileId = decodeURIComponent(params.fileId ?? "");
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const { enabled } = body as { enabled: boolean };
+    const { listStickers } = await import("../../engine/stickers.js");
+    const all = await listStickers(cfg);
+    const updated = all.map(s => {
+      if (s.fileId !== fileId) return s;
+      const tags = (s.tags ?? []).filter(t => t !== "disabled");
+      if (!enabled) tags.push("disabled");
+      return { ...s, tags };
+    });
+    const header = "# sticker library\n# Добавляй по одному file_id на строку:\n# CAACAgIAAxkBAA... | 😂 | laugh,funny\n";
+    const lines = updated.map(s => `${s.fileId} | ${s.emoji ?? ""} | ${(s.tags ?? []).join(",")}`);
+    await writeMd(slug, "stickers/library.md", header + lines.join("\n") + (lines.length ? "\n" : ""));
+    return { ok: true };
+  });
+
   // Diagnostics: which preset id? get the list
   r.get("/api/presets/llm-detect", async ({ searchParams }) => {
     const id = searchParams.get("id") ?? "";

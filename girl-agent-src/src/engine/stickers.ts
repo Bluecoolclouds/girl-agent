@@ -36,8 +36,8 @@ export async function listStickers(cfg: ProfileConfig): Promise<StickerChoice[]>
 
 export async function pickSticker(cfg: ProfileConfig, mood = ""): Promise<StickerChoice | undefined> {
   const stickers = await listStickers(cfg);
-  // Не отправляем стикеры которые были получены от собеседников — только собственные.
-  const sendable = stickers.filter(s => !s.tags?.includes("received"));
+  // Не отправляем стикеры которые были получены от собеседников или явно выключены.
+  const sendable = stickers.filter(s => !s.tags?.includes("received") && !s.tags?.includes("disabled"));
   if (!sendable.length) return undefined;
   const q = mood.toLowerCase();
   const tagged = sendable.filter(s => s.tags?.some(t => q.includes(t.toLowerCase())) || (s.emoji && q.includes(s.emoji)));

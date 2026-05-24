@@ -13,6 +13,7 @@ import { AssistantPage } from "./pages/AssistantPage";
 import { RelationshipPage } from "./pages/RelationshipPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { MediaPage } from "./pages/MediaPage";
+import { StickersPage } from "./pages/StickersPage";
 import { DialogsPage } from "./pages/DialogsPage";
 import { SetupFlow } from "./pages/SetupFlow";
 import { AuthGate } from "./components/AuthGate";
@@ -51,6 +52,7 @@ export function App() {
             {tab === "relationship" && <RelationshipPage />}
             {tab === "diagnostics" && <DiagnosticsPage />}
             {tab === "media" && <MediaPage />}
+            {tab === "stickers" && <StickersPage />}
             {tab === "dialogs" && <DialogsPage />}
           </div>
         </div>
