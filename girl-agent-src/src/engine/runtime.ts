@@ -454,13 +454,31 @@ export class Runtime extends EventEmitter {
       try {
         messageId = await this.tg.sendText(chatId, text, replyId);
       } catch (sendErr) {
-        const label = (sendErr instanceof Error ? sendErr.message : String(sendErr ?? "")).slice(0, 120);
-        this.emit("event", { type: "error", text: `send failed (bubble skipped): ${label}`, chatId } as RuntimeEvent);
-        // Remove from history since it was never delivered.
-        for (let j = hist.length - 1; j >= 0; j--) {
-          if (hist[j]!.role === "assistant" && hist[j]!.content === text) { hist.splice(j, 1); break; }
+        const errMsg = (sendErr instanceof Error ? sendErr.message : String(sendErr ?? ""));
+        const isFlood = /PEER_FLOOD|FLOOD/i.test(errMsg);
+        if (isFlood) {
+          // One retry after a fixed pause — avoids duplicates from MTProto auto-retry
+          this.emit("event", { type: "info", text: `PEER_FLOOD — ждём 8 сек, retry`, chatId } as RuntimeEvent);
+          await sleep(8000);
+          try {
+            messageId = await this.tg.sendText(chatId, text, replyId);
+          } catch (retryErr) {
+            const label = (retryErr instanceof Error ? retryErr.message : String(retryErr ?? "")).slice(0, 120);
+            this.emit("event", { type: "error", text: `send failed after retry (bubble skipped): ${label}`, chatId } as RuntimeEvent);
+            for (let j = hist.length - 1; j >= 0; j--) {
+              if (hist[j]!.role === "assistant" && hist[j]!.content === text) { hist.splice(j, 1); break; }
+            }
+            continue;
+          }
+        } else {
+          const label = errMsg.slice(0, 120);
+          this.emit("event", { type: "error", text: `send failed (bubble skipped): ${label}`, chatId } as RuntimeEvent);
+          // Remove from history since it was never delivered.
+          for (let j = hist.length - 1; j >= 0; j--) {
+            if (hist[j]!.role === "assistant" && hist[j]!.content === text) { hist.splice(j, 1); break; }
+          }
+          continue;
         }
-        continue;
       }
       this.lastRealSendMs = now;
       if (messageId) {
