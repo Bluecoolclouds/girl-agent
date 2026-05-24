@@ -309,7 +309,7 @@ export class Runtime extends EventEmitter {
     const hist = restored.map(t => ({ role: t.role, content: t.content, ts: t.ts }));
     // Если история совсем скудная — обновляем кеш выжимки в фоне (не блокируем ответ)
     if (fromId && restored.length < 4) {
-      ensureContactDigest(this.llm, this.cfg, fromId).catch(() => {});
+      ensureContactDigest(this.llm, this.cfg, fromId, this.tg).catch(() => {});
     }
     this.histories.set(key, hist);
     this.hydratePresenceTrackers(key, hist);

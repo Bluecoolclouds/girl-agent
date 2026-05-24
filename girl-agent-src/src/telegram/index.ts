@@ -86,6 +86,8 @@ export interface TgAdapter {
   getDialogs?(): Promise<DialogEntry[]>;
   /** Сканирует «Избранное» (Saved Messages) и возвращает стикеры оттуда. Только userbot. */
   scanSavedStickers?(limit: number): Promise<{ fileId: string; emoji?: string }[]>;
+  /** Скачивает историю личного чата с пользователем. Только userbot. */
+  fetchChatHistory?(chatId: number, limit: number): Promise<{ role: "user" | "assistant"; content: string; ts: number }[]>;
   stop(): Promise<void>;
 }
 

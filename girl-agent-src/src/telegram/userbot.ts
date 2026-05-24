@@ -527,6 +527,24 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       }
       return results;
     },
+    async fetchChatHistory(chatId: number, limit: number): Promise<{ role: "user" | "assistant"; content: string; ts: number }[]> {
+      const results: { role: "user" | "assistant"; content: string; ts: number }[] = [];
+      try {
+        for await (const msg of client.iterMessages(chatId, { limit })) {
+          const m = msg as Api.Message;
+          const text = m.message?.trim();
+          if (!text) continue;
+          results.push({
+            role: m.out ? "assistant" : "user",
+            content: text,
+            ts: (m.date ?? 0) * 1000
+          });
+        }
+        // iterMessages возвращает от новых к старым — переворачиваем для хронологии
+        results.reverse();
+      } catch { /* тихий no-op */ }
+      return results;
+    },
     async scanSavedStickers(limit: number): Promise<{ fileId: string; emoji?: string }[]> {
       const me = await client.getMe();
       const results: { fileId: string; emoji?: string }[] = [];

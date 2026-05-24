@@ -1,8 +1,10 @@
 import type { LLMClient } from "../llm/index.js";
 import type { ProfileConfig } from "../types.js";
-import { readMd, writeMd, listSessionDays, readSessionLog, parseSessionLogTurns } from "../storage/md.js";
+import type { TgAdapter } from "../telegram/index.js";
+import { readMd, writeMd } from "../storage/md.js";
 
 const DIGEST_FRESH_MS = 24 * 60 * 60 * 1000; // 24 часа
+const HISTORY_LIMIT = 100;
 
 function digestPath(fromId: number): string {
   return `memory/contacts/${fromId}-digest.md`;
@@ -13,19 +15,6 @@ function isDigestFresh(raw: string): boolean {
   if (!m) return false;
   const ts = Date.parse(m[1] ?? "");
   return !isNaN(ts) && Date.now() - ts < DIGEST_FRESH_MS;
-}
-
-/** Читает все логи (не только последние 4 дня) для конкретного chatId */
-async function readAllTurnsForContact(
-  slug: string,
-  fromId: number,
-  limit = 80
-): Promise<{ role: "user" | "assistant"; content: string }[]> {
-  const allDays = await listSessionDays(slug);
-  if (!allDays.length) return [];
-  const raws = await Promise.all(allDays.map(d => readSessionLog(slug, d)));
-  const combined = raws.join("\n");
-  return parseSessionLogTurns(combined, fromId, limit);
 }
 
 /** Генерирует LLM-выжимку по истории переписки с конкретным контактом */
@@ -57,20 +46,22 @@ async function generateDigest(
 }
 
 /**
- * Если история чата пустая или очень короткая — сканирует все логи,
- * генерирует LLM-выжимку и кешует её на 24ч в memory/contacts/{chatId}-digest.md.
- * Тихий no-op если истории нет вообще.
+ * Скачивает историю чата через TG, генерирует LLM-выжимку и кешует на 24ч.
+ * Тихий no-op если fetchChatHistory недоступен или история пустая.
  */
 export async function ensureContactDigest(
   llm: LLMClient,
   cfg: ProfileConfig,
-  fromId: number
+  fromId: number,
+  tg: TgAdapter
 ): Promise<void> {
   try {
     const existing = await readMd(cfg.slug, digestPath(fromId));
     if (existing.trim() && isDigestFresh(existing)) return;
 
-    const turns = await readAllTurnsForContact(cfg.slug, fromId);
+    if (!tg.fetchChatHistory) return;
+
+    const turns = await tg.fetchChatHistory(fromId, HISTORY_LIMIT);
     if (turns.length < 8) return;
 
     const digest = await generateDigest(llm, cfg.name, fromId, turns);
@@ -81,7 +72,7 @@ export async function ensureContactDigest(
       digestPath(fromId),
       `<!--generated:${new Date().toISOString()}-->\n${digest}\n`
     );
-  } catch { /* tихий no-op */ }
+  } catch { /* тихий no-op */ }
 }
 
 /** Читает закешированную выжимку (без метаданных) */
