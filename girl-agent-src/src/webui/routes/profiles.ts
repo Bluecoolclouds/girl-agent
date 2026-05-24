@@ -476,6 +476,30 @@ export function registerProfileRoutes(r: Router): void {
     return { dialogs };
   });
 
+  // Sticker thumbnail proxy — works even when agent is stopped (bot mode only)
+  r.get("/api/profiles/:slug/stickers/:fileId/thumb", async ({ params, res }) => {
+    const slug = params.slug ?? "";
+    const fileId = decodeURIComponent(params.fileId ?? "");
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const token = cfg.telegram?.botToken;
+    if (!token) throw new HttpError(404, "no bot token (userbot mode not supported for preview)");
+    try {
+      const infoRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`, { signal: AbortSignal.timeout(8000) });
+      const info = await infoRes.json() as { ok: boolean; result?: { file_path?: string } };
+      if (!info.ok || !info.result?.file_path) throw new HttpError(404, "file not found in Telegram");
+      const imgRes = await fetch(`https://api.telegram.org/file/bot${token}/${info.result.file_path}`, { signal: AbortSignal.timeout(15000) });
+      if (!imgRes.ok) throw new HttpError(502, "telegram cdn error");
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      const ct = imgRes.headers.get("content-type") ?? "image/webp";
+      res.writeHead(200, { "Content-Type": ct, "Content-Length": buf.length, "Cache-Control": "public, max-age=86400" });
+      res.end(buf);
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(502, "sticker preview unavailable");
+    }
+  });
+
   // Sticker library management
   r.get("/api/profiles/:slug/stickers", async ({ params }) => {
     const slug = params.slug ?? "";
