@@ -1872,12 +1872,33 @@ export class Runtime extends EventEmitter {
     const [cmd, arg] = action.split(":");
     try {
       switch (cmd) {
-        case "BLOCK":
+        case "BLOCK": {
+          // Сначала пишем dumped — чтобы агент перестал отвечать даже если TG-блок не поддерживается
+          const fromIdNum = typeof chatId === "string" ? parseInt(chatId, 10) : chatId;
+          if (!isNaN(fromIdNum)) {
+            try {
+              const relForBlock = await readRelationship(this.cfg.slug, fromIdNum);
+              const oldStageBlock = relForBlock.stage;
+              await writeRelationship(this.cfg.slug, { ...relForBlock, stage: "dumped" }, fromIdNum);
+              await maybeAdvanceRelationshipTimeline(this.cfg, oldStageBlock, "dumped");
+              // Отменяем pending agenda-задачи
+              const agendaBlock = await readAgenda(this.cfg.slug);
+              const pendingBlock = agendaBlock.filter(a => a.state === "pending");
+              if (pendingBlock.length > 0) {
+                pendingBlock.forEach(a => { a.state = "cancelled"; a.history = [...(a.history ?? []), `cancelled due to BLOCK at ${new Date().toISOString()}`]; });
+                await writeAgenda(this.cfg.slug, agendaBlock);
+                this.emit("event", { type: "info", text: `agenda: cancelled ${pendingBlock.length} pending items due to BLOCK`, chatId } as RuntimeEvent);
+              }
+            } catch { /* swallow — не ломаем основной flow */ }
+          }
           if (this.userbotActionAvailable("blockContact")) {
             await this.tg.blockContact?.(chatId);
-            this.emit("event", { type: "info", text: `AI tool: blocked ${chatId}`, chatId } as RuntimeEvent);
+            this.emit("event", { type: "info", text: `AI tool: blocked ${chatId} (stage → dumped)`, chatId } as RuntimeEvent);
+          } else {
+            this.emit("event", { type: "info", text: `AI tool: BLOCK — stage → dumped (TG-блок недоступен в bot-mode)`, chatId } as RuntimeEvent);
           }
           break;
+        }
         case "UNBLOCK":
           if (this.userbotActionAvailable("unblockContact")) {
             await this.tg.unblockContact?.(chatId);
