@@ -40,6 +40,10 @@ export function StickersPage() {
   const toast = useStore(s => s.toast);
   const [stickers, setStickers] = useState<Sticker[]>([]);
   const [loading, setLoading] = useState(false);
+  const [addFileId, setAddFileId] = useState("");
+  const [addEmoji, setAddEmoji] = useState("");
+  const [addTags, setAddTags] = useState("");
+  const [adding, setAdding] = useState(false);
 
   async function load() {
     if (!cfg) return;
@@ -53,6 +57,23 @@ export function StickersPage() {
   }
 
   useEffect(() => { void load(); }, [cfg?.slug]);
+
+  async function addSticker() {
+    if (!cfg || !addFileId.trim()) return;
+    setAdding(true);
+    try {
+      await api.addSticker(cfg.slug, addFileId.trim(), addEmoji.trim() || undefined, addTags.trim() ? addTags.split(",").map(t => t.trim()).filter(Boolean) : []);
+      toast("Стикер добавлен", "success");
+      setAddFileId("");
+      setAddEmoji("");
+      setAddTags("");
+      await load();
+    } catch (e) {
+      toast(`Ошибка: ${(e as Error)?.message}`, "error");
+    } finally {
+      setAdding(false);
+    }
+  }
 
   async function toggle(fileId: string, enabled: boolean) {
     if (!cfg) return;

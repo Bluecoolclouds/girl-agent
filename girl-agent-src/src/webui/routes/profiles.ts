@@ -501,6 +501,17 @@ export function registerProfileRoutes(r: Router): void {
   });
 
   // Sticker library management
+  r.post("/api/profiles/:slug/stickers", async ({ params, body }) => {
+    const slug = params.slug ?? "";
+    const cfg = await readConfig(slug);
+    if (!cfg) throw new HttpError(404, "profile not found");
+    const { fileId, emoji = "", tags = [] } = body as { fileId?: string; emoji?: string; tags?: string[] };
+    if (!fileId || fileId.trim().length < 4) throw new HttpError(400, "fileId required");
+    const { addStickerToLibrary } = await import("../../engine/stickers.js");
+    await addStickerToLibrary(cfg, fileId.trim(), emoji, Array.isArray(tags) ? tags : []);
+    return { ok: true };
+  });
+
   r.get("/api/profiles/:slug/stickers", async ({ params }) => {
     const slug = params.slug ?? "";
     if (!await readConfig(slug)) throw new HttpError(404, "profile not found");
