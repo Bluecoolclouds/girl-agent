@@ -1209,7 +1209,7 @@ export class Runtime extends EventEmitter {
       recordInteractionMemory(this.llm, this.cfg, lastUser ?? "", sent.join(" / "), typeof chatId === "number" ? chatId : undefined, "primary").catch(() => {});
     }
 
-    if (this.tg.sendSticker && Math.random() < 0.08) {
+    if (this.tg.sendSticker && (this.cfg.stickersEnabled !== false) && Math.random() < 0.08) {
       const sticker = await pickSticker(this.cfg, sent.join(" "));
       if (sticker) await this.tg.sendSticker(chatId, sticker.fileId).catch(() => {});
     }

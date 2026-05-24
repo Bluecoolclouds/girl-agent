@@ -159,6 +159,8 @@ export interface ProfileConfig {
   reengageAfterDays?: number;
   /** Быстрый переход стадии по сигналу покупки: если true, явный интерес к контенту/цене пропускает порог сообщений. */
   intentStageJump?: boolean;
+  /** Отправлять стикеры случайно после ответов (8% шанс). По умолчанию true. */
+  stickersEnabled?: boolean;
 }
 
 export interface RelationshipScore {

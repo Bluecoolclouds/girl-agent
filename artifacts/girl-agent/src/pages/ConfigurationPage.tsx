@@ -302,6 +302,27 @@ export function ConfigurationPage() {
 
       <div className="card">
         <div className="card-header">
+          <div className="h-title">Стикеры</div>
+        </div>
+        <div className="form-row">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={(merged as any).stickersEnabled !== false}
+              onChange={e => pf("stickersEnabled" as any, e.target.checked)}
+            />
+            <span>Отправлять стикеры случайно</span>
+          </label>
+          <div className="hint">
+            {(merged as any).stickersEnabled !== false
+              ? "Включено. Бот иногда (8% шанс) отправляет стикер после ответа. Только стикеры из вашей библиотеки — полученные от собеседников не отправляются."
+              : "Выключено. Стикеры не отправляются совсем."}
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
           <div className="h-title">Переход по сигналу покупки</div>
         </div>
         <div className="form-row">
