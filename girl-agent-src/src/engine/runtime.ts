@@ -434,6 +434,9 @@ export class Runtime extends EventEmitter {
         this.emit("event", { type: "info", text: `skip duplicate bubble: "${text.slice(0, 60)}"`, chatId } as RuntimeEvent);
         continue;
       }
+      // Push to history BEFORE sending so concurrent sendBubbles calls see it as duplicate.
+      const now = Date.now();
+      hist.push({ role: "assistant", content: text, ts: now });
       if (typing) {
         await this.tg.setTyping(chatId, true).catch(() => {});
         await sleep(350 + Math.random() * 900);
@@ -447,8 +450,18 @@ export class Runtime extends EventEmitter {
       }
       if (typing) await this.tg.setTyping(chatId, true).catch(() => {});
       const replyId = i === 0 ? replyToMessageId : undefined;
-      const messageId = await this.tg.sendText(chatId, text, replyId);
-      const now = Date.now();
+      let messageId: number | undefined;
+      try {
+        messageId = await this.tg.sendText(chatId, text, replyId);
+      } catch (sendErr) {
+        const label = (sendErr instanceof Error ? sendErr.message : String(sendErr ?? "")).slice(0, 120);
+        this.emit("event", { type: "error", text: `send failed (bubble skipped): ${label}`, chatId } as RuntimeEvent);
+        // Remove from history since it was never delivered.
+        for (let j = hist.length - 1; j >= 0; j--) {
+          if (hist[j]!.role === "assistant" && hist[j]!.content === text) { hist.splice(j, 1); break; }
+        }
+        continue;
+      }
       this.lastRealSendMs = now;
       if (messageId) {
         this.lastSentByChat.set(this.histKey(chatId), messageId);
@@ -458,7 +471,7 @@ export class Runtime extends EventEmitter {
           const fixDelay = 2_000 + Math.random() * 6_000;
           setTimeout(async () => {
             try {
-              await this.tg.editText!(chatId, messageId, rawText);
+              await this.tg.editText!(chatId, messageId!, rawText);
               this.emit("event", { type: "info", text: `edit-self: "${text.slice(0, 30)}" → "${rawText.slice(0, 30)}"`, chatId } as RuntimeEvent);
               await appendSessionLog(this.cfg.slug, this.cfg.tz, `  ~ edit "${text.slice(0, 40)}" → "${rawText.slice(0, 40)}"`, typeof chatId === "number" ? chatId : undefined).catch(() => {});
               // Обновляем буфер sentMessages и history.
@@ -472,7 +485,6 @@ export class Runtime extends EventEmitter {
           }, fixDelay).unref?.();
         }
       }
-      hist.push({ role: "assistant", content: text, ts: now });
       this.lastHerReplyTs.set(this.histKey(chatId), Date.now());
       this.bumpStageStats("her");
       this.emit("event", { type: "outgoing", text, chatId } as RuntimeEvent);

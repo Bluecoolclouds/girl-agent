@@ -61,7 +61,7 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
     requestRetries: 5,
     retryDelay: 3000,
     autoReconnect: true,
-    floodSleepThreshold: 120,
+    floodSleepThreshold: 0,
     useWSS,
     proxy
   });
