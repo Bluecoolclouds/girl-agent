@@ -1249,7 +1249,9 @@ export class Runtime extends EventEmitter {
     const item = due[0]!;
     // Если в этом чате недавно (10мин) уже была какая-то активность — не лезем сейчас
     const key = this.histKey(item.chatId);
-    const hist = await this.historyFor(key, this.cfg.ownerId, true);
+    const itemChatIdNum = typeof item.chatId === "number" ? item.chatId : undefined;
+    const isOwnerChat = !!itemChatIdNum && itemChatIdNum === this.cfg.ownerId;
+    const hist = await this.historyFor(key, itemChatIdNum, isOwnerChat);
     const conflict = await readConflict(this.cfg.slug);
     const presence = computePresenceState(
       this.cfg,
@@ -1304,10 +1306,11 @@ export class Runtime extends EventEmitter {
     }
   }
 
-  private async composeProactiveMessage(item: { about: string; reason: string; importance: 1 | 2 | 3; attempts: number }, hist: ConversationTurn[]): Promise<string> {
+  private async composeProactiveMessage(item: { about: string; reason: string; importance: 1 | 2 | 3; attempts: number; chatId?: number | string }, hist: ConversationTurn[]): Promise<string> {
+    const targetId = typeof item.chatId === "number" ? item.chatId : (this.cfg.ownerId ?? undefined);
     const conflict = await readConflict(this.cfg.slug);
     const realism = await loadRealismContext(this.cfg, item.about);
-    const sys = await buildSystemPrompt(this.cfg, { dailyLife: this.dailyLife, conflict, realism, tgUsername: this.tgSelf.username, tgDisplayName: this.tgSelf.displayName, fromId: this.cfg.ownerId ?? undefined });
+    const sys = await buildSystemPrompt(this.cfg, { dailyLife: this.dailyLife, conflict, realism, tgUsername: this.tgSelf.username, tgDisplayName: this.tgSelf.displayName, fromId: targetId });
 
     // Собираем краткую выжимку из истории для подсказки
     const lastMessages = hist.slice(-10);
