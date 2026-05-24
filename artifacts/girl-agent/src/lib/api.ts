@@ -198,7 +198,6 @@ export const api = {
   async pickNames(nationality: "RU" | "UA", count = 12) { return req<{ names: string[] }>("GET", `/api/presets/names?nationality=${nationality}&count=${count}`); },
 
   async listStickers(slug: string) { return req<{ stickers: { fileId: string; emoji?: string; tags?: string[] }[] }>("GET", `/api/profiles/${slug}/stickers`); },
-  async addSticker(slug: string, fileId: string, emoji?: string, tags?: string[]) { return req<{ ok: true }>("POST", `/api/profiles/${slug}/stickers`, { fileId, emoji, tags }); },
   async deleteSticker(slug: string, fileId: string) { return req<{ ok: true }>("DELETE", `/api/profiles/${slug}/stickers/${encodeURIComponent(fileId)}`); },
   async toggleSticker(slug: string, fileId: string, enabled: boolean) { return req<{ ok: true }>("PATCH", `/api/profiles/${slug}/stickers/${encodeURIComponent(fileId)}`, { enabled }); },
 
