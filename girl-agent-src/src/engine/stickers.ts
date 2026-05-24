@@ -36,10 +36,12 @@ export async function listStickers(cfg: ProfileConfig): Promise<StickerChoice[]>
 
 export async function pickSticker(cfg: ProfileConfig, mood = ""): Promise<StickerChoice | undefined> {
   const stickers = await listStickers(cfg);
-  if (!stickers.length) return undefined;
+  // Не отправляем стикеры которые были получены от собеседников — только собственные.
+  const sendable = stickers.filter(s => !s.tags?.includes("received"));
+  if (!sendable.length) return undefined;
   const q = mood.toLowerCase();
-  const tagged = stickers.filter(s => s.tags?.some(t => q.includes(t.toLowerCase())) || (s.emoji && q.includes(s.emoji)));
-  const pool = tagged.length ? tagged : stickers;
+  const tagged = sendable.filter(s => s.tags?.some(t => q.includes(t.toLowerCase())) || (s.emoji && q.includes(s.emoji)));
+  const pool = tagged.length ? tagged : sendable;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
