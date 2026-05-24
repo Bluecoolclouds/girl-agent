@@ -458,8 +458,8 @@ export class Runtime extends EventEmitter {
         const isFlood = /PEER_FLOOD|FLOOD/i.test(errMsg);
         if (isFlood) {
           // One retry after a fixed pause — avoids duplicates from MTProto auto-retry
-          this.emit("event", { type: "info", text: `PEER_FLOOD — ждём 8 сек, retry`, chatId } as RuntimeEvent);
-          await sleep(8000);
+          this.emit("event", { type: "info", text: `PEER_FLOOD — ждём 120 сек, retry`, chatId } as RuntimeEvent);
+          await sleep(120_000);
           try {
             messageId = await this.tg.sendText(chatId, text, replyId);
           } catch (retryErr) {
