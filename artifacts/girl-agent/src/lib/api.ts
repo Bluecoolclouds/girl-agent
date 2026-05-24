@@ -197,7 +197,7 @@ export const api = {
   async listTimezones(q = "") { return req<{ zones: { iana: string; gmtWinter: string; city: string; country: string; aliases: string[]; group?: "UA" | "CIS" | "RU" }[] }>("GET", `/api/presets/timezones?q=${encodeURIComponent(q)}`); },
   async pickNames(nationality: "RU" | "UA", count = 12) { return req<{ names: string[] }>("GET", `/api/presets/names?nationality=${nationality}&count=${count}`); },
 
-  async getVersion() { return req<{ current: string; latest: string | null }>("GET", "/api/system/version"); },
+  async getVersion() { return req<{ current: string; latest: string | null; commit?: string }>("GET", "/api/system/version"); },
   async getDiagnostics() { return req<{ platform: string; arch: string; node: string; hostname: string; uptime: number; dataRoot: string; ipv4: string[]; memTotalMB: number }>("GET", "/api/system/diagnostics"); },
 
   async listAddons() { return req<{ available: AddonManifest[]; installed: InstalledAddon[] }>("GET", "/api/addons"); },

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
 export function DiagnosticsPage() {
-  const [version, setVersion] = useState<{ current: string; latest: string | null } | null>(null);
+  const [version, setVersion] = useState<{ current: string; latest: string | null; commit?: string } | null>(null);
   const [diag, setDiag] = useState<{ platform: string; arch: string; node: string; hostname: string; uptime: number; dataRoot: string; ipv4: string[]; memTotalMB: number } | null>(null);
 
   useEffect(() => {
@@ -17,6 +17,12 @@ export function DiagnosticsPage() {
         <div className="grid cols-2">
           <div className="form-row"><label>Текущая</label><div>{version?.current ?? "..."}</div></div>
           <div className="form-row"><label>Последняя</label><div>{version?.latest ?? "—"}</div></div>
+          {version?.commit && (
+            <div className="form-row" style={{ gridColumn: "span 2" }}>
+              <label>Commit</label>
+              <div style={{ fontFamily: "var(--ga-font-mono)", fontSize: 12 }}>{version.commit}</div>
+            </div>
+          )}
         </div>
         <div className="hint">обновление: <code>npm i -g @thesashadev/girl-agent</code> или <code>docker pull ghcr.io/thesashadev/girl-agent:latest</code></div>
       </div>

@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import os from "node:os";
+import { execSync } from "node:child_process";
 import { DATA_ROOT } from "../../storage/md.js";
 
 let cachedVersion: string | null = null;
@@ -31,10 +32,16 @@ async function readPackageVersion(): Promise<string> {
   return "0.0.0";
 }
 
+function readGitCommit(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch { return "unknown"; }
+}
+
 export function registerSystemRoutes(r: Router): void {
   r.get("/api/system/version", async () => {
     const current = await readPackageVersion();
-    return { current, latest: null };
+    return { current, latest: null, commit: readGitCommit() };
   });
 
   r.get("/api/system/diagnostics", async () => {
