@@ -1411,7 +1411,8 @@ export class Runtime extends EventEmitter {
         this.emit("event", { type: "error", text: `[broadcast:${jobId}] ошибка → ${chatId}: ${(e as Error)?.message ?? String(e)}` } as RuntimeEvent);
       }
       if (chatId !== recipients[recipients.length - 1]) {
-        const delay = 3000 + Math.floor(Math.random() * 5000);
+        const delay = 60_000 + Math.floor(Math.random() * 60_000);
+        this.emit("event", { type: "info", text: `[broadcast:${jobId}] пауза ${Math.round(delay / 1000)} сек перед следующим…` } as RuntimeEvent);
         await sleep(delay);
       }
     }
