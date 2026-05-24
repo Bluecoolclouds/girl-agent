@@ -33,6 +33,7 @@ import { applyLLMUpdate, describeLLM } from "../config/llm-update.js";
 import { injectTypos, pickTypoIntensity } from "./typos.js";
 import { decideStageTransition, shouldRunStageTransitionCheck } from "./stage-transitions.js";
 import { classifyDeletionAwareness, shouldRespondToDeletion, buildDeletionPromptContext, isInHistory as deletionInHistory } from "./deletion-handler.js";
+import { ensureContactDigest, readContactDigest } from "./contact-digest.js";
 import { decideEmojiReactionResponse, shouldThrottleEmojiReactions, isToxicReactionAboutHerSelf } from "./emoji-reaction-handler.js";
 import type { DeletedMessageContext } from "../types.js";
 
@@ -306,6 +307,10 @@ export class Runtime extends EventEmitter {
     const limit = isPrimary ? 40 : 20;
     const restored = await readRecentSessionTurns(this.cfg.slug, this.cfg.tz, fromId, limit);
     const hist = restored.map(t => ({ role: t.role, content: t.content, ts: t.ts }));
+    // Если история совсем скудная — обновляем кеш выжимки в фоне (не блокируем ответ)
+    if (fromId && restored.length < 4) {
+      ensureContactDigest(this.llm, this.cfg, fromId).catch(() => {});
+    }
     this.histories.set(key, hist);
     this.hydratePresenceTrackers(key, hist);
     return hist;
@@ -1129,6 +1134,9 @@ export class Runtime extends EventEmitter {
     const conflict = scope === "primary" ? await readConflict(this.cfg.slug) : undefined;
     const lastUser = hist[hist.length - 1]?.role === "user" ? hist[hist.length - 1]?.content : undefined;
     const realism = scope === "primary" ? await loadRealismContext(this.cfg, lastUser) : undefined;
+    const chatDigest = (scope === "primary" && incoming?.fromId && hist.length < 4)
+      ? await readContactDigest(this.cfg, incoming.fromId)
+      : "";
     const sys = await buildSystemPrompt(this.cfg, {
       dailyLife: this.dailyLife,
       conflict,
@@ -1140,7 +1148,8 @@ export class Runtime extends EventEmitter {
       media: incoming?.media,
       tgUsername: this.tgSelf.username,
       tgDisplayName: this.tgSelf.displayName,
-      fromId: incoming?.fromId
+      fromId: incoming?.fromId,
+      chatDigest: chatDigest || undefined
     });
     const channelLink = this.cfg.photoChannelLink ?? null;
     const scopeHint = scope === "acquaintance"

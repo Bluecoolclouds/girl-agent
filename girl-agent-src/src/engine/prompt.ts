@@ -1,5 +1,6 @@
 import type { ProfileConfig, StageId } from "../types.js";
 import { readSharedMemory, searchDailySummaries, searchSharedMemory, readMd, readRelationship } from "../storage/md.js";
+import { readContactDigest } from "./contact-digest.js";
 import { listPhotoTags, listChannelPhotos } from "./photos.js";
 import { computeHormones, hormonesMd } from "./hormones.js";
 import { computePresenceProfile } from "./presence.js";
@@ -249,6 +250,8 @@ export interface BuildPromptCtx {
   /** Отображаемое имя в ТГ (может отличаться от persona) */
   tgDisplayName?: string;
   fromId?: number;
+  /** Выжимка прошлого общения с этим контактом (для чатов где история в памяти пуста) */
+  chatDigest?: string;
 }
 
 export async function buildSystemPrompt(cfg: ProfileConfig, ctx: BuildPromptCtx = {}): Promise<string> {
@@ -396,7 +399,8 @@ ${channelPhotos.map(p => `- ${p.caption ?? p.type}`).join("\n")}
     `Описание стадии: ${stage.description}`,
     `Score: ${JSON.stringify(rel.score)}`,
     longTerm.trim() ? `## legacy long-term memory о юзере\n${longTerm.slice(-2200)}` : "",
-    recall
+    recall,
+    ctx.chatDigest ? `## Выжимка прошлого общения с этим человеком (история была восстановлена из архива)\nИспользуй как фоновую память — помни как обычный человек, не цитируй буквально.\n${ctx.chatDigest}` : ""
   ].filter(Boolean).join("\n\n");
 }
 
