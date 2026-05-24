@@ -522,7 +522,8 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
         const lastMessageOutgoing = Boolean(msg?.out);
         const isUser = className === "User";
         const blocked = Boolean(entity.blocked);
-        results.push({ chatId, name, username, lastMessageText, lastMessageDate, lastMessageOutgoing, isUser, blocked });
+        const unreadCount = Number((dialog as any).dialog?.unreadCount ?? (dialog as any).unreadCount ?? 0);
+        results.push({ chatId, name, username, lastMessageText, lastMessageDate, lastMessageOutgoing, unreadCount, isUser, blocked });
       }
       return results;
     },

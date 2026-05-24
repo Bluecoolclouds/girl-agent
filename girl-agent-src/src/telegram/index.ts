@@ -96,6 +96,8 @@ export interface DialogEntry {
   lastMessageText: string;
   lastMessageDate: number;
   lastMessageOutgoing: boolean;
+  /** Количество непрочитанных сообщений в диалоге */
+  unreadCount?: number;
   /** true только для приватных чатов с реальным пользователем (User entity), false для групп/каналов */
   isUser?: boolean;
   /** true если контакт заблокирован */

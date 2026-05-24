@@ -33,6 +33,7 @@ export function DialogsPage() {
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [silentFilter, setSilentFilter] = useState<number | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [page, setPage] = useState(0);
   const [reengageStates, setReengageStates] = useState<Map<number, ReengageState>>(new Map());
@@ -57,6 +58,7 @@ export function DialogsPage() {
     setError(null);
     setSearch("");
     setSilentFilter(null);
+    setUnreadOnly(false);
     setPage(0);
   }, [cfg?.slug]);
 
@@ -111,6 +113,9 @@ export function DialogsPage() {
   if (silentFilter !== null) {
     filtered = filtered.filter(d => silentDays(d.lastMessageDate) >= silentFilter);
   }
+  if (unreadOnly) {
+    filtered = filtered.filter(d => (d.unreadCount ?? 0) > 0);
+  }
   const sorted = [...filtered].sort((a, b) =>
     sortDir === "desc"
       ? b.lastMessageDate - a.lastMessageDate
@@ -128,7 +133,9 @@ export function DialogsPage() {
         <div className="card-header">
           <div className="h-title">Диалоги</div>
           <div className="h-meta">
-            {loaded ? `${filtered.length} из ${dialogs.length}` : "не загружены"}
+            {loaded
+              ? `${filtered.length} из ${dialogs.length}${dialogs.filter(d => (d.unreadCount ?? 0) > 0).length > 0 ? ` · ${dialogs.filter(d => (d.unreadCount ?? 0) > 0).length} непрочитанных` : ""}`
+              : "не загружены"}
           </div>
           <div className="h-actions">
             <button className="btn tiny primary" onClick={load} disabled={loading}>
@@ -158,6 +165,12 @@ export function DialogsPage() {
             <option value="14">Молчат ≥ 14 дней</option>
             <option value="30">Молчат ≥ 30 дней</option>
           </select>
+          <button
+            className={`btn tiny${unreadOnly ? " primary" : ""}`}
+            onClick={() => { setUnreadOnly(v => !v); setPage(0); }}
+          >
+            {unreadOnly ? "● Непрочитанные" : "○ Непрочитанные"}
+          </button>
           <button
             className="btn tiny"
             onClick={() => { setSortDir(d => d === "desc" ? "asc" : "desc"); setPage(0); }}
@@ -196,6 +209,7 @@ export function DialogsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--ga-border)", color: "var(--ga-text-dim)" }}>
+                  <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500, width: 28 }}></th>
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}>Имя</th>
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500 }}>Username</th>
                   <th style={{ textAlign: "left", padding: "4px 8px", fontWeight: 500, fontFamily: "var(--ga-font-mono)" }}>chatId</th>
@@ -212,9 +226,20 @@ export function DialogsPage() {
                   return (
                     <tr
                       key={d.chatId}
-                      style={{ borderBottom: "1px solid var(--ga-border)", verticalAlign: "top" }}
+                      style={{ borderBottom: "1px solid var(--ga-border)", verticalAlign: "top", background: (d.unreadCount ?? 0) > 0 ? "rgba(var(--ga-accent-rgb, 180,120,255), 0.06)" : undefined }}
                     >
-                      <td style={{ padding: "6px 8px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <td style={{ padding: "6px 8px", width: 28, textAlign: "center" }}>
+                        {(d.unreadCount ?? 0) > 0 && (
+                          <span style={{
+                            display: "inline-block", minWidth: 18, height: 18, borderRadius: 9,
+                            background: "var(--ga-accent)", color: "#fff",
+                            fontSize: 10, fontWeight: 700, lineHeight: "18px", textAlign: "center", padding: "0 4px"
+                          }}>
+                            {d.unreadCount}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "6px 8px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: (d.unreadCount ?? 0) > 0 ? 600 : undefined }}>
                         {d.name}
                       </td>
                       <td style={{ padding: "6px 8px", color: "var(--ga-text-dim)", fontFamily: "var(--ga-font-mono)", fontSize: 12 }}>

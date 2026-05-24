@@ -288,6 +288,7 @@ export interface DialogEntry {
   lastMessageText: string;
   lastMessageDate: number;
   lastMessageOutgoing: boolean;
+  unreadCount?: number;
   isUser?: boolean;
   blocked?: boolean;
 }
