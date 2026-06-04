@@ -1181,11 +1181,20 @@ export class Runtime extends EventEmitter {
       });
     }
     let reply = "";
+    let typingKeepalive: NodeJS.Timeout | undefined;
     try {
-      if (tick.typing) await this.tg.setTyping(chatId, true);
+      if (tick.typing) {
+        await this.tg.setTyping(chatId, true).catch(() => {});
+        // Telegram гасит "печатает..." через ~5с — обновляем каждые 4с пока LLM думает
+        typingKeepalive = setInterval(() => {
+          this.tg.setTyping(chatId, true).catch(() => {});
+        }, 4000);
+        typingKeepalive.unref?.();
+      }
       reply = sanitizeModelReply(await this.llm.chat(messages, { temperature: 0.95, maxTokens: 3500 }));
     } catch (e) {
       // техническая ошибка LLM — не вытягиваем юзера ретраем, молча уходим в ignored
+      if (typingKeepalive) clearInterval(typingKeepalive);
       if (isQuotaExhaustedError(e)) {
         // Токены/баланс кончились — полностью уходим в офлайн, НЕ читаем сообщения, НЕ отвечаем.
         this.quotaExhausted = true;
@@ -1197,6 +1206,7 @@ export class Runtime extends EventEmitter {
       await this.sendSafeFallback(chatId, hist, scope, "llm-error");
       return;
     }
+    if (typingKeepalive) clearInterval(typingKeepalive);
     if (!reply) {
       // Пустой/санитайзнутый ответ — пробуем один ретрай с более строгим промптом,
       // чтобы не уходить молча в игнор (раздражающее поведение).
