@@ -1047,7 +1047,10 @@ export class Runtime extends EventEmitter {
     if (tick.reaction) {
       // Task #3: реакция может быть на любое из последних 10 его сообщений, не только на текущее.
       const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId, tick.reactionTargetMessageId);
-      const reactDelay = Math.min(tick.delaySec, 30) * 1000 * (tick.shouldReply ? 0.3 : 1);
+      // Если она офлайн (большой delay) — реагирует незадолго до ответа, а не сразу
+      const reactDelay = tick.delaySec > 60
+        ? (tick.delaySec * 0.85 + Math.random() * 15) * 1000
+        : Math.min(tick.delaySec, 30) * 1000 * (tick.shouldReply ? 0.3 : 1);
       setTimeout(async () => {
         // Поставить реакцию = прочесть сообщение, поэтому readHistory всегда вместе с реакцией
         if (this.userbotActionAvailable("readHistory")) {
@@ -1074,7 +1077,9 @@ export class Runtime extends EventEmitter {
         : ["❤", 0.35] as const;
       if (Math.random() < fbChance) {
         const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId);
-        const fbDelay = (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
+        const fbDelay = tick.delaySec > 60
+          ? (tick.delaySec * 0.80 + Math.random() * 20) * 1000
+          : (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
         setTimeout(async () => {
           // Поставить реакцию = прочесть сообщение
           if (this.userbotActionAvailable("readHistory")) {
