@@ -345,17 +345,9 @@ export function computePresenceState(
     const isEvening = localHour >= 18;
     // isNightOwl: активна с 22:00 и до 8:00 (если не спит — asleep уже проверен).
     const isNightOwl = localHour >= 22 || localHour < 8;
-    if (profile.pattern === "evening-only" && !isEvening) {
-      online = false;
-      const minutesToEvening = Math.max(1, minutesUntil(localHour, localMinute, 18, 0));
-      const capMin = communication.notifications === "priority" ? 20 : communication.initiative === "high" ? 35 : minutesToEvening;
-      nextCheckSec = Math.min(minutesToEvening, capMin) * 60 + Math.floor(Math.random() * 600);
-    } else if (profile.pattern === "phone-attached-night" && !isNightOwl) {
-      online = false;
-      const minutesToNight = Math.max(1, minutesUntil(localHour, localMinute, 22, 0));
-      const capMin = communication.notifications === "priority" ? 15 : communication.initiative === "high" ? 30 : 75;
-      nextCheckSec = Math.min(minutesToNight, capMin) * 60 + Math.floor(Math.random() * 600);
-    } else {
+    // Временны́е ворота паттернов отключены — evening-only/phone-attached-night
+    // не блокируют по времени суток, работают как обычные паттерны с вероятностью.
+    {
       // Использую псевдо-случайный окно: вероятность что СЕЙЧАС в окне = onlineWindow / (onlineWindow + checkEvery)
       const onlineProb = profile.onlineWindowMin / (profile.onlineWindowMin + profile.checkEveryMin);
       online = Math.random() < onlineProb;

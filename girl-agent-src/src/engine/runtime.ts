@@ -1084,6 +1084,11 @@ export class Runtime extends EventEmitter {
       this.checkStageTransition(m.fromId, incomingText).catch(() => {});
     }
 
+    // Прочитала → должна ответить (читать и молчать — нереалистично и бесит)
+    if (tick.shouldRead && !tick.shouldReply) {
+      Object.assign(tick, { shouldReply: true, intent: "reply" });
+    }
+
     if (!tick.shouldReply) {
       this.lastDecision.set(key, baseDecision);
       if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
