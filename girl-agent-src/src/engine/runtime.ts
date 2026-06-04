@@ -1050,7 +1050,8 @@ export class Runtime extends EventEmitter {
     }
 
     // fallback-реакция когда она отвечает но LLM не вернул reaction
-    if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot") {
+    // Не ставим реакции если спит (и не ночное пробуждение) — спящий человек ничего не делает
+    if (!tick.reaction && tick.shouldReply && this.cfg.mode === "userbot" && !(presence.asleep && !presence.nightAwake)) {
       const [fbEmoji, fbChance] = ["long-term", "dating-stable"].includes(localStage)
         ? ["❤", 0.5] as const
         : localStage === "dating-early"
