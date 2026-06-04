@@ -1039,7 +1039,8 @@ export class Runtime extends EventEmitter {
       const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId, tick.reactionTargetMessageId);
       const reactDelay = Math.min(tick.delaySec, 30) * 1000 * (tick.shouldReply ? 0.3 : 1);
       setTimeout(async () => {
-        if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
+        // Поставить реакцию = прочесть сообщение, поэтому readHistory всегда вместе с реакцией
+        if (this.userbotActionAvailable("readHistory")) {
           await this.tg.readHistory?.(m.chatId).catch(() => {});
         }
         await this.tg.setReaction(m.chatId, target.messageId, tick.reaction!).catch(() => {});
@@ -1065,6 +1066,10 @@ export class Runtime extends EventEmitter {
         const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId);
         const fbDelay = (Math.min(tick.delaySec, 30) * 0.3 + Math.random() * 5) * 1000;
         setTimeout(async () => {
+          // Поставить реакцию = прочесть сообщение
+          if (this.userbotActionAvailable("readHistory")) {
+            await this.tg.readHistory?.(m.chatId).catch(() => {});
+          }
           await this.tg.setReaction(m.chatId, target.messageId, fbEmoji).catch(() => {});
           this.emit("event", { type: "info", text: `${fbEmoji} (reply-react fallback)` } as RuntimeEvent);
           appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ${fbEmoji} reply-react-fallback`, m.fromId).catch(() => {});
