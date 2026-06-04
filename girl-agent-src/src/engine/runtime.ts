@@ -908,6 +908,10 @@ export class Runtime extends EventEmitter {
           }, reactDelay).unref?.();
         }
       }
+      // Не спит → подписчик должен получить ответ
+      if (!tick.shouldReply && !acqPresence.asleep) {
+        Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply" });
+      }
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
     }
@@ -976,6 +980,12 @@ export class Runtime extends EventEmitter {
       isAcquaintance: !isPrimary
     });
     if (this.incomingSeq.get(key) !== seq) return;
+
+    // Не спит и не cold-конфликт → должна ответить (читать и молчать нереалистично)
+    if (!tick.shouldReply && !presence.asleep && !coldActive) {
+      Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply" });
+    }
+
     const baseDecision: DecisionSnapshot = {
       chatId: m.chatId,
       at: Date.now(),
@@ -1084,11 +1094,6 @@ export class Runtime extends EventEmitter {
       this.checkStageTransition(m.fromId, incomingText).catch(() => {});
     }
 
-    // Прочитала → должна ответить (читать и молчать — нереалистично и бесит)
-    if (tick.shouldRead && !tick.shouldReply) {
-      Object.assign(tick, { shouldReply: true, intent: "reply" });
-    }
-
     if (!tick.shouldReply) {
       this.lastDecision.set(key, baseDecision);
       if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
@@ -1115,7 +1120,7 @@ export class Runtime extends EventEmitter {
           }, delay).unref?.();
         }
       }
-      this.emit("event", { type: "ignored", text: incomingText, reason: tick.ignoreReason ?? tick.intent } as RuntimeEvent);
+      this.emit("event", { type: "ignored", text: "", reason: tick.ignoreReason ?? tick.intent } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ignored (${tick.intent}: ${tick.ignoreReason ?? ""})`, m.fromId);
       recordInteractionMemory(this.llm, this.cfg, incomingText, undefined, m.fromId, "primary").catch(() => {});
       return;
