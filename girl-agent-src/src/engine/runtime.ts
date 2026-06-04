@@ -1039,7 +1039,7 @@ export class Runtime extends EventEmitter {
       const target = this.pickReactionTarget(this.histKey(m.chatId), m.messageId, tick.reactionTargetMessageId);
       const reactDelay = Math.min(tick.delaySec, 30) * 1000 * (tick.shouldReply ? 0.3 : 1);
       setTimeout(async () => {
-        if (this.userbotActionAvailable("readHistory")) {
+        if (tick.shouldRead && this.userbotActionAvailable("readHistory")) {
           await this.tg.readHistory?.(m.chatId).catch(() => {});
         }
         await this.tg.setReaction(m.chatId, target.messageId, tick.reaction!).catch(() => {});
@@ -2198,6 +2198,20 @@ export class Runtime extends EventEmitter {
   private async handleEmojiReaction(m: IncomingMessage): Promise<void> {
     if (!m.emojiReaction) return;
     const now = Date.now();
+
+    // Если спит — не читает и не реагирует (как реальный человек)
+    const key = this.histKey(m.chatId);
+    const forcedWake = now < this.forcedWakeUntil && (!this.forcedWakeChatId || this.forcedWakeChatId === key);
+    const presence = computePresenceState(
+      this.cfg, this.presenceProfile,
+      this.lastUserMsgTs.get(key) ?? 0,
+      this.lastHerReplyTs.get(key) ?? 0,
+      this.exchangeCount.get(key) ?? 0,
+      forcedWake,
+      null
+    );
+    if (presence.asleep && !presence.nightAwake) return;
+
     // Anti-flood — учитываем только за последнюю минуту.
     this.recentEmojiReactionTs = this.recentEmojiReactionTs.filter(ts => now - ts < 60_000);
     this.recentEmojiReactionTs.push(now);
@@ -2207,7 +2221,6 @@ export class Runtime extends EventEmitter {
     }
     const isPrimary = this.isPrimaryFrom(m.fromId);
     if (!isPrimary) return; // эмодзи от посторонних игнорим
-    const key = this.histKey(m.chatId);
     const hist = await this.historyFor(key, m.fromId, isPrimary);
     // Находим её сообщение из sentMessages по messageId.
     const sentRec = [...this.sentMessages].reverse().find(s => s.messageId === m.emojiReaction!.targetMessageId);
