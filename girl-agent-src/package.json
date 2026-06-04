@@ -60,6 +60,7 @@
     "typescript": "^5.7.2"
   },
   "overrides": {
-    "ip-address": "^10.2.0"
+    "ip-address": "^10.2.0",
+    "es5-ext": "0.10.53"
   }
 }
