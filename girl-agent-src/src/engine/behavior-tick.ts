@@ -26,7 +26,7 @@ interface BehaviorContext {
 
 function reactionMenu(stage: string, score: { attraction: number; interest: number; annoyance: number; cringe: number }): string {
   const isWarm = score.attraction > 30 || ["dating-early", "dating-stable", "long-term"].includes(stage);
-  const isCold = score.annoyance > 40 || stage === "tg-given-cold";
+  const isCold = score.annoyance > 40;
 
   if (isWarm) {
     return `Доступные реакции (СТАДИЯ ТЁПЛАЯ — она расположена к нему):
@@ -108,6 +108,7 @@ ${ctx.recentIncomingIds?.length ? reactionsHint + "\n" + formatIncomingIds(ctx.r
 - Длинная простыня от него — bubbles её ответа НЕ становится больше; скорее наоборот.
 - ВАЖНО: если он явно говорит что готов платить / купить контент ("я готов купить", "куплю", "хочу купить", "сколько стоит", "как купить", "готов платить") — это КОММЕРЧЕСКИЙ сигнал, не давление. annoyance НЕ растёт, cringe НЕ растёт. interest +3..+6, attraction без изменений или +1..+3.
 - ВАЖНО: вопросы о канале ("есть канал?", "скинь", "где найти", "как подписаться", "ссылку дай") — это тоже КОММЕРЧЕСКИЙ сигнал. annoyance НЕ растёт, cringe НЕ растёт. Максимум interest +1..+2.
+- ВАЖНО: просьбы показать себя/фото ("покаж себя", "скинь фото", "покажи", "можешь фото") — для контент-мейкера это РАБОЧИЙ ЗАПРОС, не домогательство. annoyance НЕ растёт, cringe НЕ растёт. Это её аудитория. Максимум annoyance +1 только если пишет грубо.
 - moodDelta: маленькие числа -10..+10.${ctx.isAcquaintance ? `
 - РЕЖИМ ПОДПИСЧИКА (acquaintance): Это потенциальный покупатель фото-контента, не случайный незнакомец. Правила скоринга отличаются:
   • Прямые запросы фото/контента в первых 1-3 сообщениях ("покажи", "скинь фото", "хочу купить") — это НОРМА для этой аудитории. МАКСИМАЛЬНЫЙ штраф: annoyance +2, cringe +2. НЕ даёт -10 и не даёт -15.
@@ -291,7 +292,7 @@ export async function behaviorTick(
 
 function sanitizeReaction(emoji: string, stage: string, score: { attraction: number; annoyance: number }): string | undefined {
   const isWarm = score.attraction > 30 || ["dating-early", "dating-stable", "long-term"].includes(stage);
-  const isCold = score.annoyance > 40 || stage === "tg-given-cold";
+  const isCold = score.annoyance > 40;
   const FORBIDDEN_WHEN_WARM = new Set(["🤡", "💀", "🤮", "🖕", "😐", "🙄"]);
   const FORBIDDEN_WHEN_COLD = new Set(["❤", "❤️", "🥰", "🥹", "🥺", "🔥"]);
   if (isWarm && FORBIDDEN_WHEN_WARM.has(emoji)) {
