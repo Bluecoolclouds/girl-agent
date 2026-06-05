@@ -910,7 +910,7 @@ export class Runtime extends EventEmitter {
       }
       // Не спит → подписчик должен получить ответ
       if (!tick.shouldReply && !acqPresence.asleep) {
-        Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply" });
+        Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply", typing: true });
       }
       this.scheduleReply(key, m.chatId, hist, tick, "acquaintance", romanticApproach, m, undefined, tick.delaySec);
       return;
@@ -983,7 +983,7 @@ export class Runtime extends EventEmitter {
 
     // Не спит и не cold-конфликт → должна ответить (читать и молчать нереалистично)
     if (!tick.shouldReply && !presence.asleep && !coldActive) {
-      Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply" });
+      Object.assign(tick, { shouldReply: true, shouldRead: true, intent: "reply", typing: true });
     }
 
     const baseDecision: DecisionSnapshot = {
