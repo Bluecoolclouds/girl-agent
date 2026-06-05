@@ -316,7 +316,7 @@ function ignoreMultiplier(profile: CommunicationProfile, ignoreTendency: number)
 
 function activeDialogDelay(profile: CommunicationProfile): number {
   const base = profile.notifications === "priority" ? 3 : profile.notifications === "muted" ? 18 : 8;
-  const spread = profile.messageStyle === "one-liners" ? 55 : profile.messageStyle === "bursty" ? 25 : 40;
+  const spread = profile.messageStyle === "one-liners" ? 55 : (profile.messageStyle === "bursty" || profile.messageStyle === "seller") ? 25 : 40;
   return base + Math.random() * spread;
 }
 
@@ -326,6 +326,10 @@ function sampleBubbles(profile: CommunicationProfile, activeDialog: boolean): nu
   if (profile.messageStyle === "bursty") {
     if (activeDialog) return 2 + Math.floor(Math.random() * 4);
     return r < 0.18 ? 1 : 2 + Math.floor(Math.random() * 3);
+  }
+  if (profile.messageStyle === "seller") {
+    if (activeDialog) return r < 0.3 ? 1 : 2 + Math.floor(Math.random() * 2);
+    return r < 0.45 ? 1 : 2;
   }
   if (profile.messageStyle === "longform") {
     if (activeDialog) return r < 0.2 ? 1 : 2 + Math.floor(Math.random() * 2);
@@ -380,6 +384,7 @@ function normalizeBubbles(value: number, profile: CommunicationProfile, intent: 
   const sampled = Number.isFinite(Number(value)) ? Number(value) : sampleBubbles(profile, !!activeDialog);
   if (profile.messageStyle === "one-liners") return clamp(sampled, 1, activeDialog ? 2 : 1);
   if (profile.messageStyle === "bursty") return clamp(sampled, 1, 6);
+  if (profile.messageStyle === "seller") return clamp(sampled, 1, 3);
   if (profile.messageStyle === "longform") return clamp(sampled, 1, 4);
   return clamp(sampled, 1, 3);
 }

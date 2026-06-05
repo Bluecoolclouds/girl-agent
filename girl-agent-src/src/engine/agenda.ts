@@ -2,7 +2,7 @@ import type { ProfileConfig, Weekday } from "../types.js";
 import type { LLMClient } from "../llm/index.js";
 import { readAgenda, writeAgenda, readMd, writeMd, readRelationship, type AgendaItem } from "../storage/md.js";
 import { findStage } from "../presets/stages.js";
-import { communicationDecisionState, normalizeCommunicationProfile } from "../presets/communication.js";
+import { communicationDecisionState, isSellerMode, normalizeCommunicationProfile } from "../presets/communication.js";
 import type { DailyLife } from "./daily-life.js";
 import type { ConflictState } from "./conflict.js";
 import { searchPalaceDrawers } from "./memory-palace.js";
@@ -119,9 +119,9 @@ function localParts(tz: string, when: Date): { hour: number; minute: number; wee
   }
 }
 
-function maxAutonomousItems(stage: string, initiative: "low" | "medium" | "high"): number {
+function maxAutonomousItems(stage: string, initiative: "low" | "medium" | "high", sellerMode = false): number {
   let base =
-    stage === "tg-given-cold" ? (initiative === "high" ? 1 : 0) :
+    stage === "tg-given-cold" ? (initiative === "high" || sellerMode ? 2 : 0) :
     stage === "met-irl-got-tg" ? 1 :
     stage === "tg-given-warming" ? 1 :
     stage === "convinced" || stage === "first-date-done" ? 2 :
@@ -129,6 +129,7 @@ function maxAutonomousItems(stage: string, initiative: "low" | "medium" | "high"
     4;
   if (initiative === "low") base = Math.max(0, base - 1);
   if (initiative === "high") base += 1;
+  if (sellerMode) base = Math.max(base, 3);
   return base;
 }
 
@@ -201,6 +202,31 @@ const SYS_AUTONOMOUS = `Ты — внутренний планировщик п�
   ]
 }`;
 
+const SYS_AUTONOMOUS_SELLER = (channelLink: string) => `Ты — внутренний планировщик проактивности девушки-контентмейкера. Она живёт своей жизнью И одновременно ведёт закрытый канал с фото. Её задача — аккуратно, по-живому, без навязчивости прогревать мужчину: к себе, к каналу, к покупке.
+
+Задача — создать реалистичные поводы написать ему сегодня/завтра. Это НЕ скрипт продаж. Это живая девушка, которая иногда упоминает контент как часть своей жизни.
+
+Разрешённые темы для проактивных сообщений:
+- Бытовые/личные (как обычно): "устала", "скучно", "видела кое-что смешное"
+- Прогрев канала: "залила сегодня кое-что", "сделала новый сет — уже в канале", "ты кстати заходил уже?"
+- Интрига без давления: "хм, не знаю слать ли тебе это", "сделала кое-что интересное, но это только для канала"
+- Мягкий оффер: "у меня там акция на этой неделе, если интересно"
+- Личная связь + намёк: "думала о тебе пока снималась 🙈"
+
+ЗАПРЕЩЕНО: агрессивные продажи, спам одним и тем же, давление, слово "купи". Каждое сообщение должно быть живым и не выглядеть скриптом.${channelLink ? `\n\nСсылка на закрытый канал: ${channelLink} — можно упоминать если уместно, не вставлять в каждое сообщение.` : ""}
+
+Верни СТРОГО JSON:
+{
+  "items": [
+    {
+      "about": "коротко тема её будущего сообщения",
+      "reason": "почему она сама напишет, по-человечески",
+      "pingAt": "ISO-время когда написать",
+      "importance": 1
+    }
+  ]
+}`;
+
 const TEMPLATE_AUTONOMOUS = (
   state: string,
   dailyLife: DailyLife,
@@ -252,8 +278,9 @@ export async function extractAgendaUpdates(
 ): Promise<{ created: number; updated: number; cancelled: number }> {
   const stage = findStage(cfg.stage);
   const communication = normalizeCommunicationProfile(cfg);
-  // Агенда не для холодных стадий — экономим LLM-вызовы.
-  if ((cfg.stage === "tg-given-cold" && communication.initiative !== "high") || (cfg.stage === "met-irl-got-tg" && communication.initiative === "low")) {
+  // Агенда не для холодных стадий — экономим LLM-вызовы. Seller-режим исключение: он работает на любой стадии.
+  const _isSeller = isSellerMode(communication);
+  if (!_isSeller && ((cfg.stage === "tg-given-cold" && communication.initiative !== "high") || (cfg.stage === "met-irl-got-tg" && communication.initiative === "low"))) {
     return { created: 0, updated: 0, cancelled: 0 };
   }
 
@@ -339,7 +366,8 @@ export async function ensureAutonomousAgenda(
 
   const agenda = await readAgenda(cfg.slug);
   const communication = normalizeCommunicationProfile(cfg);
-  const maxItems = maxAutonomousItems(cfg.stage, communication.initiative);
+  const sellerMode = isSellerMode(communication);
+  const maxItems = maxAutonomousItems(cfg.stage, communication.initiative, sellerMode);
   if (maxItems <= 0) {
     await writeMd(cfg.slug, statePath, `${state.trim()}\nautonomous:${dateKey} created=0`.trim() + "\n");
     return { created: 0 };
@@ -377,10 +405,13 @@ export async function ensureAutonomousAgenda(
     longTerm ? `# long-term memory (что реально известно о нём):\n${longTerm}` : "# long-term memory: (пусто — пока ничего не знаешь о нём, НЕ придумывай факты)"
   ].filter(Boolean).join("\n\n");
 
+  const channelLink = sellerMode ? ((cfg as unknown as Record<string, unknown>).photoChannelLink as string | undefined) ?? "" : "";
+  const sysPrompt = sellerMode ? SYS_AUTONOMOUS_SELLER(channelLink) : SYS_AUTONOMOUS;
+
   let items: AutonomousItem[] = [];
   try {
     const raw = await llm.chat(
-      [{ role: "system", content: SYS_AUTONOMOUS }, { role: "user", content: TEMPLATE_AUTONOMOUS(stateBlock, dailyLife, histStr, agenda, new Date().toISOString(), cfg.tz, maxItems - pendingSoon.length) }],
+      [{ role: "system", content: sysPrompt }, { role: "user", content: TEMPLATE_AUTONOMOUS(stateBlock, dailyLife, histStr, agenda, new Date().toISOString(), cfg.tz, maxItems - pendingSoon.length) }],
       { temperature: 0.8, maxTokens: 3500, json: true }
     );
     const parsed = JSON.parse(raw);

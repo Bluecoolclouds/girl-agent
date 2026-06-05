@@ -38,7 +38,7 @@ export function computePresenceProfile(cfg: ProfileConfig): PresenceProfile {
   ];
   let pattern = patterns[Math.floor(r(1) * patterns.length)] ?? "burst-checker";
   if (communication.notifications === "priority") {
-    pattern = communication.messageStyle === "bursty" || pattern === "rare-checker" || pattern === "evening-only" ? "phone-attached" : pattern;
+    pattern = communication.messageStyle === "bursty" || communication.messageStyle === "seller" || pattern === "rare-checker" || pattern === "evening-only" ? "phone-attached" : pattern;
   } else if (communication.notifications === "muted") {
     pattern = pattern === "phone-attached" ? "burst-checker" : pattern === "phone-attached-night" ? "evening-only" : pattern;
   }

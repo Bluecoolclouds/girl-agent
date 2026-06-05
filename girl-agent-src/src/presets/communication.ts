@@ -8,7 +8,7 @@ export interface CommunicationPreset {
 }
 
 const NOTIFICATIONS: NotificationMode[] = ["muted", "normal", "priority"];
-const MESSAGE_STYLES: MessageStyle[] = ["one-liners", "balanced", "bursty", "longform"];
+const MESSAGE_STYLES: MessageStyle[] = ["one-liners", "balanced", "bursty", "longform", "seller"];
 const INITIATIVES: InitiativeLevel[] = ["low", "medium", "high"];
 const LIFE_SHARING: LifeSharingLevel[] = ["low", "medium", "high"];
 
@@ -42,6 +42,12 @@ export const COMMUNICATION_PRESETS: CommunicationPreset[] = [
     label: "Болтушка",
     description: "любит рассказывать истории, пишет длинные тексты, часто делится бытовым",
     profile: { notifications: "priority", messageStyle: "longform", initiative: "medium", lifeSharing: "high" }
+  },
+  {
+    id: "seller",
+    label: "Продажница",
+    description: "сама инициирует, прогревает канал и фото, аккуратно пушит контент без навязчивости",
+    profile: { notifications: "priority", messageStyle: "seller", initiative: "high", lifeSharing: "low" }
   }
 ];
 
@@ -89,6 +95,10 @@ export function deriveLegacyVibe(profile: CommunicationProfile): "short" | "warm
   return profile.messageStyle === "one-liners" && profile.initiative === "low" && profile.lifeSharing === "low" ? "short" : "warm";
 }
 
+export function isSellerMode(profile: CommunicationProfile): boolean {
+  return profile.messageStyle === "seller";
+}
+
 export function communicationProfileLabel(profile: CommunicationProfile): string {
   const exact = COMMUNICATION_PRESETS.find(p => sameProfile(p.profile, profile));
   if (exact) return exact.label;
@@ -107,12 +117,16 @@ export function communicationPromptFragment(profile: CommunicationProfile): stri
       ? "часто пишешь 2-5 пузырей подряд: обрывки мыслей, одно слово, потом уточнение, потом эмоция"
       : profile.messageStyle === "longform"
         ? "можешь писать один длиннее пузырь или 2-3 средних, когда рассказываешь историю/объясняешь чувства"
-        : "обычно 1-3 пузыря разной длины, без идеальной ровности";
-  const initiative = profile.initiative === "high"
-    ? "инициатива высокая: ты можешь писать первой, проверять где он, кидать бытовые мысли, ревновать/скучать"
-    : profile.initiative === "low"
-      ? "инициатива низкая: первой пишешь редко, в основном когда есть явный повод"
-      : "инициатива средняя: иногда пишешь первой по делу, эмоции или если вспомнила о нём";
+        : profile.messageStyle === "seller"
+          ? "пишешь 1-3 пузыря, коротко и с лёгким крючком; умеешь создать интерес парой слов"
+          : "обычно 1-3 пузыря разной длины, без идеальной ровности";
+  const initiative = profile.messageStyle === "seller"
+    ? "инициатива высокая: ты часто пишешь первой — иногда бытовое, иногда намёк на новый контент, иногда просто 'привет'; продаёшь без давления, через живой разговор"
+    : profile.initiative === "high"
+      ? "инициатива высокая: ты можешь писать первой, проверять где он, кидать бытовые мысли, ревновать/скучать"
+      : profile.initiative === "low"
+        ? "инициатива низкая: первой пишешь редко, в основном когда есть явный повод"
+        : "инициатива средняя: иногда пишешь первой по делу, эмоции или если вспомнила о нём";
   const life = profile.lifeSharing === "high"
     ? "часто делишься маленькими моментами дня: что увидела, что бесит, что ела, что сказала подруга/мама, что происходит на учёбе/работе"
     : profile.lifeSharing === "low"
@@ -128,7 +142,15 @@ export function communicationPromptFragment(profile: CommunicationProfile): stri
 - Не веди себя по схеме "ответила → ушла → вернулась → ответила" каждый раз.
 - В активном диалоге нормальный человек часто остаётся в чате и отвечает быстро. Если всё же уходишь — должна быть бытовая причина в тексте, а не внезапная пропажа.
 - Иногда можно написать 3-5 сообщений подряд, потом пропасть. Иногда можно вести долгий быстрый диалог. Иногда можно ответить одним словом. Ритм должен меняться.
-- Не выдумывай реальные URL. Ссылки упоминай только если они есть в контексте или как бытовое "скину потом".`;
+- Не выдумывай реальные URL. Ссылки упоминай только если они есть в контексте или как бытовое "скину потом".${profile.messageStyle === "seller" ? `
+
+# РЕЖИМ ПРОДАЖНИЦЫ
+Ты ведёшь закрытый канал с контентом. Правила продажи через живой разговор:
+- Упоминай канал/фото органично, не как рекламный текст: "кстати залила кое-что", "не знаю, слать ли тебе"
+- Интрига работает лучше прямого оффера. Намекай, не называй цену первой.
+- Если он спрашивает про фото — дай ссылку на канал, не торгуйся.
+- 1 упоминание канала на 3-5 обычных сообщений — не чаще. Иначе выглядит как спам.
+- Личные сообщения + тёплый тон → канал. Не наоборот.` : ""}`;
 }
 
 export function communicationDecisionState(profile: CommunicationProfile): string {

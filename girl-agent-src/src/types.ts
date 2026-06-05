@@ -88,7 +88,7 @@ export interface BusySlot {
 
 export type NotificationMode = "muted" | "normal" | "priority";
 
-export type MessageStyle = "one-liners" | "balanced" | "bursty" | "longform";
+export type MessageStyle = "one-liners" | "balanced" | "bursty" | "longform" | "seller";
 
 export type InitiativeLevel = "low" | "medium" | "high";
 
