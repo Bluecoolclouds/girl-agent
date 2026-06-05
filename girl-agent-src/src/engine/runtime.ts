@@ -1244,9 +1244,9 @@ export class Runtime extends EventEmitter {
     const bubbles = dedupeBubbles(smartSplitBubbles(cleanedReply, tick.bubbles || 1)).slice(0, Math.max(tick.bubbles || 1, 1));
     const sent = await this.sendBubbles(chatId, bubbles, hist, scope, tick.typing, replyToMessageId);
     if (!sent.length) {
-      // Все пузыри были дублями — ответ уже был ранее, тихо игнорируем.
-      this.emit("event", { type: "info", text: "все пузыри — дубли, silent fallback", chatId } as RuntimeEvent);
-      await this.sendSafeFallback(chatId, hist, scope, "all-bubbles-duplicate");
+      // Все пузыри были дублями — пробуем нейтральный филлер вместо тихого игнора.
+      this.emit("event", { type: "info", text: "все пузыри — дубли, отправляем нейтральный филлер", chatId } as RuntimeEvent);
+      await this.sendNeutralFiller(chatId, hist, scope, tick.typing ?? false);
       return;
     }
     this.setDecisionStatus(this.histKey(chatId), "sent");
@@ -2373,6 +2373,9 @@ function bubbleIsContainedIn(shorter: string, longer: string): boolean {
   const b = normalizeForDuplicate(longer);
   if (!a || !b || a === b) return false;
   if (a.length >= b.length) return false;
+  // Очень короткие строки (≤5 символов) — слишком часто дают ложные совпадения
+  // ("мг" входит в "ну мг и мг" как подстрока, но это НЕ повтор).
+  if (a.length <= 5) return false;
   if (b.includes(a)) return true;
   const shortTokens = bubbleTokens(shorter);
   if (shortTokens.length < 2) return false;
