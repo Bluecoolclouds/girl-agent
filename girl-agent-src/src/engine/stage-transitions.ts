@@ -38,19 +38,33 @@ export interface StageTransitionResult {
 }
 
 /**
- * SOFT CLOSE — ценовой интерес/любопытство к контенту.
- * Сигнал: человек интересуется, но ещё не сказал "куплю прямо сейчас".
- * Действие: переход на стадию 4 (convinced) — тизеринг, интрига, подводка к цене.
+ * Двухцелевая воронка:
+ *   Цель 1 — ПОДПИСКА: человек просит доступ/ссылку на канал.
+ *   Цель 2 — ПРОДАЖА: человек прямо говорит, что платит (hard close).
+ *
+ * CURIOSITY — самый слабый сигнал: интересуется контентом/ценой, но доступ
+ * ещё не просил. Ведёт только на прогрев (стадия 3, тизеринг), не на оффер.
  */
-const SOFT_CLOSE_PATTERNS = [
-  // Прайс/покупка — общее
-  /сколько стоит/i, /как купить/i, /где купить/i, /как оплатить/i,
-  /сколько берёшь/i, /сколько берешь/i,
-  // TG-приватка — интерес, хочет узнать/посмотреть
-  /приватк[аеуи]/i, /приват\b/i,
-  /закрытый канал/i, /платный канал/i, /приватный канал/i,
+const CURIOSITY_PATTERNS = [
+  // Прайс — интересуется, но доступ не просил
+  /сколько стоит/i, /сколько берёшь/i, /сколько берешь/i,
+  // Есть ли вообще контент
+  /ты продаёшь/i, /ты продаешь/i, /продаёшь фото/i, /продаешь фото/i,
+  /есть что посмотреть/i, /есть контент/i,
   /есть канал/i, /свой канал/i,
-  // Ссылка и доступ — хочет посмотреть, ещё не факт что купит
+  /закрытый канал/i, /платный канал/i, /приватный канал/i,
+  /приватк[аеуи]/i, /приват\b/i,
+  // Запрос фото/видео напрямую в личку
+  /покажи фото/i, /покажи видео/i, /скинь фото/i, /скинь видео/i,
+  /пришли фото/i, /пришли видео/i, /хочу посмотреть/i, /хочу увидеть/i,
+];
+
+/**
+ * ЦЕЛЬ 1 — SUBSCRIBE: просит доступ к каналу / ссылку / как подписаться.
+ * Действие: переход на стадию 4 (convinced) — там уместно дать ссылку и цену.
+ */
+const SUBSCRIBE_PATTERNS = [
+  // Ссылка и доступ
   /дай ссылку/i, /скинь ссылку/i, /есть ссылка/i,
   /ссылку на канал/i, /ссылку на приватк/i,
   /хочу доступ/i, /как вступить/i, /как попасть в канал/i,
@@ -58,12 +72,8 @@ const SOFT_CLOSE_PATTERNS = [
   // Подписка
   /как подписаться/i, /где подписаться/i, /подпишусь/i,
   /куда подписаться/i,
-  // Запрос фото/видео (интерес, ещё не покупка)
-  /покажи фото/i, /покажи видео/i, /скинь фото/i, /скинь видео/i,
-  /пришли фото/i, /пришли видео/i, /хочу посмотреть/i, /хочу увидеть/i,
-  // Продаёшь контент?
-  /ты продаёшь/i, /ты продаешь/i, /продаёшь фото/i, /продаешь фото/i,
-  /есть что посмотреть/i, /есть контент/i,
+  // Как оплатить доступ
+  /как купить/i, /где купить/i, /как оплатить/i,
 ];
 
 /**
@@ -78,17 +88,24 @@ const HARD_CLOSE_PATTERNS = [
   /оплачу\b/i, /переведу\b/i,
 ];
 
-export function hasSoftCloseIntent(text: string): boolean {
-  return SOFT_CLOSE_PATTERNS.some(p => p.test(text));
+/** Слабый интерес к контенту/цене — доступ ещё не просил. */
+export function hasCuriosityIntent(text: string): boolean {
+  return CURIOSITY_PATTERNS.some(p => p.test(text));
 }
 
+/** ЦЕЛЬ 1 — просит доступ/ссылку/как подписаться. */
+export function hasSubscribeIntent(text: string): boolean {
+  return SUBSCRIBE_PATTERNS.some(p => p.test(text));
+}
+
+/** ЦЕЛЬ 2 — прямо говорит, что платит. */
 export function hasHardCloseIntent(text: string): boolean {
   return HARD_CLOSE_PATTERNS.some(p => p.test(text));
 }
 
-/** Любой сигнал покупки (soft или hard) — для обхода порога сообщений. */
+/** Любой сигнал покупки — для обхода порога минимума сообщений. */
 export function hasPurchaseIntent(text: string): boolean {
-  return hasSoftCloseIntent(text) || hasHardCloseIntent(text);
+  return hasCuriosityIntent(text) || hasSubscribeIntent(text) || hasHardCloseIntent(text);
 }
 
 const STAGE_ORDER: StageId[] = [
@@ -113,27 +130,35 @@ export function decideStageTransition(ctx: StageTransitionContext): StageTransit
   const idx = stageIndex(ctx.currentStage);
   if (idx < 0) return null;
 
-  // Intent jump: двухступенчатый — hard close или soft close
+  // Intent jump: трёхступенчатый, но всегда не больше +1 стадии за раз.
+  // Прыжок 1→5 убран намеренно: одно слово "куплю" со стадии знакомства
+  // раньше открывало explicit-тир контента, минуя весь прогрев.
   if (ctx.intentJumpEnabled && ctx.lastIncomingText) {
     const text = ctx.lastIncomingText;
 
-    // HARD CLOSE: "готов платить", "дай ссылку", "хочу купить" и т.п.
-    // Стадии 1-4 → сразу first-date-done (закрываем сделку немедленно)
+    /** Шаг на одну стадию в сторону цели, не дальше самой цели. */
+    const stepTowards = (target: StageId, reason: string): StageTransitionResult | null => {
+      const targetIdx = stageIndex(target);
+      if (targetIdx <= idx) return null;
+      return { next: STAGE_ORDER[Math.min(idx + 1, targetIdx)]!, reason, direction: "up" };
+    };
+
+    // ЦЕЛЬ 2 — прямо говорит, что платит: ведём к first-date-done (стадия 5).
     if (hasHardCloseIntent(text)) {
-      const hardStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming", "convinced"];
-      if (hardStages.includes(ctx.currentStage)) {
-        return { next: "first-date-done", reason: "hard-close: готов купить прямо сейчас", direction: "up" };
-      }
+      const r = stepTowards("first-date-done", "hard-close: готов купить прямо сейчас");
+      if (r) return r;
     }
 
-    // SOFT CLOSE: "сколько стоит", "покажи фото", "есть onlyfans" и т.п.
-    // Стадии 1-3 → convinced (стадия 4): начинаем тизеринг и подводку к цене
-    // Стадия 4 — уже там, не трогаем
-    if (hasSoftCloseIntent(text)) {
-      const preConvincedStages: StageId[] = ["met-irl-got-tg", "tg-given-cold", "tg-given-warming"];
-      if (preConvincedStages.includes(ctx.currentStage)) {
-        return { next: "convinced", reason: "soft-close: интерес к контенту/цене", direction: "up" };
-      }
+    // ЦЕЛЬ 1 — просит доступ/ссылку: ведём к convinced (стадия 4), где уместен оффер.
+    if (hasSubscribeIntent(text)) {
+      const r = stepTowards("convinced", "subscribe: просит доступ к каналу");
+      if (r) return r;
+    }
+
+    // Слабый сигнал — только прогрев до tg-given-warming (стадия 3), без оффера.
+    if (hasCuriosityIntent(text)) {
+      const r = stepTowards("tg-given-warming", "curiosity: интерес к контенту/цене");
+      if (r) return r;
     }
   }
 

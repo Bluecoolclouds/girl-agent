@@ -256,7 +256,8 @@ export function SetupFlow() {
       const useRemote = d.userbotMethod === "proxy";
       const apiId = useRemote ? undefined : Number(d.apiId);
       const apiHash = useRemote ? undefined : d.apiHash;
-      const r = await api.tgSendCode({ phone: d.phone, useRemote, apiId, apiHash });
+      // proxy нужен при логине со своими creds: gramjs идёт в Telegram напрямую.
+      const r = await api.tgSendCode({ phone: d.phone, useRemote, apiId, apiHash, proxy: d.proxy || undefined });
       patch({ loginToken: r.loginToken, loginSessionId: r.sessionId, sendingCode: false });
       toast("Код отправлен в Telegram", "success");
     } catch (e) {
@@ -589,10 +590,17 @@ export function SetupFlow() {
                   </div>
                 </div>
                 {d.userbotMethod === "own" && (
-                  <div className="grid cols-2">
-                    <div className="form-row"><label>API ID</label><input className="input" value={d.apiId} onChange={e => set("apiId", e.target.value)} /></div>
-                    <div className="form-row"><label>API Hash</label><input className="input" type="password" value={d.apiHash} onChange={e => set("apiHash", e.target.value)} /></div>
-                  </div>
+                  <>
+                    <div className="grid cols-2">
+                      <div className="form-row"><label>API ID</label><input className="input" value={d.apiId} onChange={e => set("apiId", e.target.value)} /></div>
+                      <div className="form-row"><label>API Hash</label><input className="input" type="password" value={d.apiHash} onChange={e => set("apiHash", e.target.value)} /></div>
+                    </div>
+                    <div className="form-row">
+                      <label>Прокси (необязательно)</label>
+                      <input className="input" value={d.proxy} onChange={e => set("proxy", e.target.value)} placeholder="tg://proxy?... или socks5://login:pass@host:port" />
+                      <div className="hint">Нужен, если Telegram у вас блокируется: запрос кода идёт напрямую в Telegram. Тот же прокси сохранится в конфиг профиля.</div>
+                    </div>
+                  </>
                 )}
                 <div className="form-row">
                   <label>Телефон</label>

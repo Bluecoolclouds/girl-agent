@@ -1,7 +1,7 @@
 import { TelegramClient, Api } from "telegram";
 import bigInt from "big-integer";
 import { StringSession } from "telegram/sessions/index.js";
-import type { ProfileConfig } from "../types.js";
+import type { ProfileConfig, TelegramProxyConfig } from "../types.js";
 import type { IncomingMedia, TgAdapter, DialogEntry } from "./index.js";
 import { NewMessage } from "telegram/events/index.js";
 import { Raw } from "telegram/events/Raw.js";
@@ -21,8 +21,21 @@ function debug(message: string): void {
   if (process.env.GIRL_AGENT_DEBUG === "1") process.stderr.write(`${message}\n`);
 }
 
-function clientProxy(cfg: ProfileConfig): ProxyInterface | undefined {
-  const proxy = cfg.telegram.proxy;
+/** Пишет всегда, даже без GIRL_AGENT_DEBUG — для того, что нельзя пропустить. */
+function warn(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
+
+/**
+ * FLOOD_WAIT / PEER_FLOOD — единственные ошибки, которые нельзя терять:
+ * это сигнал, что аккаунт близко к ограничению или уже под ним.
+ */
+function isFloodError(e: unknown): boolean {
+  const msg = e instanceof Error ? `${e.message} ${(e as { errorMessage?: string }).errorMessage ?? ""}` : String(e);
+  return /FLOOD_WAIT|PEER_FLOOD|SLOWMODE_WAIT|TOO_MANY_REQUESTS/i.test(msg);
+}
+
+function clientProxy(proxy: TelegramProxyConfig | undefined): ProxyInterface | undefined {
   if (!proxy) return undefined;
   if (proxy.MTProxy && proxy.secret) {
     return {
@@ -53,7 +66,7 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
   if (!effectiveApiId || !effectiveApiHash) throw new Error("API_ID/API_HASH missing for userbot: выбери «прокси автора» в WebUI или укажи свои api_id/api_hash");
 
   const useWSS = cfg.telegram.useWSS !== false;
-  const proxy = clientProxy(cfg);
+  const proxy = clientProxy(cfg.telegram.proxy);
   debug(`[userbot] creating TelegramClient (useWSS=${useWSS}${proxy ? ", proxy=on" : ""})…`);
 
   const client = new TelegramClient(new StringSession(session), effectiveApiId, effectiveApiHash, {
@@ -65,7 +78,16 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
     useWSS,
     proxy
   });
-  client.onError = async () => { /* swallow _updateLoop ping TIMEOUT noise */ };
+  // Глушим шум ping TIMEOUT из _updateLoop, но НЕ флуд-ошибки: раньше
+  // FLOOD_WAIT уходил в пустоту (floodSleepThreshold=0 его тоже не спит),
+  // и аккаунт молча уезжал в ограничение.
+  client.onError = async (e: unknown) => {
+    if (isFloodError(e)) {
+      warn(`[userbot] ⚠ FLOOD: ${(e as Error)?.message ?? String(e)} — аккаунт под ограничением Telegram, снизь темп рассылки`);
+      return;
+    }
+    debug(`[userbot] client error: ${(e as Error)?.message ?? String(e)}`);
+  };
   let me: Api.User | null = null;
   const peerCache = new Map<string | number, Api.TypeInputPeer>();
 
@@ -449,7 +471,9 @@ export function makeUserbotAdapter(cfg: ProfileConfig): TgAdapter {
       const numId = Number(channelId); // отрицательное число типа -1003972740948
       let entity: any;
       try {
-        entity = await client.getEntity(BigInt(numId));
+        // bigInt() из big-integer, а не нативный BigInt: GramJS ждёт именно
+        // BigInteger, с нативным getEntity всегда падал в fallback по диалогам.
+        entity = await client.getEntity(bigInt(numId));
         process.stderr.write(`[channel-scan] entity найден: id=${(entity as any)?.id} className=${(entity as any)?.className}\n`);
       } catch (e1) {
         // Fallback: перебираем диалоги
@@ -577,12 +601,16 @@ export async function userbotLogin(opts: {
   apiId: number;
   apiHash: string;
   phone: string;
+  /** SOCKS/MTProxy на этапе логина: без него в регионе с блокировкой
+   *  client.start() упирается в таймаут ещё до отправки кода. */
+  proxy?: TelegramProxyConfig;
   promptCode: () => Promise<string>;
   promptPassword: () => Promise<string>;
 }): Promise<string> {
   const client = new TelegramClient(new StringSession(""), opts.apiId, opts.apiHash, {
     connectionRetries: 5,
-    useWSS: true
+    useWSS: true,
+    proxy: clientProxy(opts.proxy)
   });
   await client.start({
     phoneNumber: async () => opts.phone,

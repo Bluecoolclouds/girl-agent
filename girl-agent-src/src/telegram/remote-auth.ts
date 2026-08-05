@@ -9,7 +9,8 @@
 const DEFAULT_PROXY = "https://tgproxy.girl-agent.com";
 
 function proxyUrl(): string {
-  return process.env.GIRL_AGENT_AUTH_PROXY ?? DEFAULT_PROXY;
+  // Трейлинг-слеш убираем: иначе base + "/send-code" даст "//send-code".
+  return (process.env.GIRL_AGENT_AUTH_PROXY ?? DEFAULT_PROXY).trim().replace(/\/+$/, "");
 }
 
 export interface SendCodeResult {
@@ -30,12 +31,42 @@ export interface Needs2FA {
 export type VerifyCodeResult = AuthSuccess | Needs2FA;
 
 async function post<T>(path: string, body: Record<string, string>): Promise<T> {
-  const res = await fetch(`${proxyUrl()}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json() as T & { error?: string };
+  const base = proxyUrl();
+  const hint = `Сервис ${base} недоступен. Войди со своими api_id/api_hash (my.telegram.org) либо укажи рабочий GIRL_AGENT_AUTH_PROXY.`;
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // Свой сервис авторизации может требовать токен (см. auth-proxy-server.ts).
+  const token = process.env.GIRL_AGENT_AUTH_PROXY_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new Error(`Прокси авторизации недоступен (${base}${path}): ${(e as Error).message}. ${hint}`);
+  }
+
+  // Сначала текст: апстрим может отдать HTML (Cloudflare, заглушка, блокировка
+  // провайдера). res.json() до проверки res.ok превращал это в безымянное
+  // «Unexpected token '<'» вместо внятного статуса.
+  const raw = await res.text();
+  let data: (T & { error?: string }) | null = null;
+  if (raw.trim()) {
+    try { data = JSON.parse(raw) as T & { error?: string }; } catch { /* not json */ }
+  }
+
+  if (!data) {
+    const ct = res.headers.get("content-type") ?? "unknown";
+    const head = raw.slice(0, 100).replace(/\s+/g, " ").trim();
+    throw new Error(
+      `Прокси авторизации вернул ${res.status} (${ct}) вместо JSON${head ? `: «${head}…»` : ""}. ${hint}`
+    );
+  }
+
   if (!res.ok) throw new Error(data.error ?? `proxy ${path} failed (${res.status})`);
   return data;
 }

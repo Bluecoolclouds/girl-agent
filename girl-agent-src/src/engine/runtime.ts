@@ -99,10 +99,16 @@ export class Runtime extends EventEmitter {
   private sentMessages: Array<{ key: string; chatId: number | string; messageId: number; ts: number; text?: string }> = [];
   /** История входящих message-id по каждому чату (для Task #3: реакция на любое из последних 10). */
   private incomingMsgIds = new Map<string, Array<{ messageId: number; ts: number; text: string }>>();
-  /** Счётчик сообщений в текущей стадии (для Task #4: smart stage transitions). */
+  /**
+   * Счётчики сообщений в стадии — ключ `${chatKey}|${stage}`.
+   * Пер-контактно: при работе с десятками лидов общий счётчик набивался
+   * чужими диалогами и стадии прыгали у тех, кто вообще не писал.
+   */
   private stageStats = new Map<string, { herMsgs: number; hisMsgs: number; ignoresInStage: number; lastCheckAt: number; stageEnteredAt: number }>();
-  /** Проверено ли stage-transition на этом входящем сообщении. */
-  private msgsSinceStageCheck = 0;
+  /** Сообщений с последней проверки stage-transition — пер-контактно. */
+  private msgsSinceStageCheck = new Map<string, number>();
+  /** Текущая стадия каждого контакта (кэш, чтобы счётчики не зависели от cfg.stage). */
+  private contactStage = new Map<string, StageId>();
   /** Счётчик эмодзи-реакций в последние 60c для anti-flood. */
   private recentEmojiReactionTs: number[] = [];
   /** Последняя реакция по ключу чата — передаётся в behaviorTick если пришла < 5 мин назад. */
@@ -509,7 +515,7 @@ export class Runtime extends EventEmitter {
         }
       }
       this.lastHerReplyTs.set(this.histKey(chatId), Date.now());
-      this.bumpStageStats("her");
+      this.bumpStageStats(this.histKey(chatId), "her");
       this.emit("event", { type: "outgoing", text, chatId } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> она: ${text}`, typeof chatId === "number" ? chatId : undefined);
       sent.push(text);
@@ -791,8 +797,10 @@ export class Runtime extends EventEmitter {
         return;
       }
       this.recordIncomingForReactions(m, this.histKey(m.chatId));
-      this.bumpStageStats("his");
       const key = this.histKey(m.chatId);
+      // Стадия этого контакта — чтобы счётчики легли в правильный ключ.
+      this.contactStage.set(key, localStage as StageId);
+      this.bumpStageStats(key, "his");
       const seq = (this.incomingSeq.get(key) ?? 0) + 1;
       this.incomingSeq.set(key, seq);
       this.pendingReplyIncoming.set(key, m);
@@ -1094,9 +1102,12 @@ export class Runtime extends EventEmitter {
 
     // Task #4: умная смена стадии (проверка раз в 5 сообщений).
     // Intent jump: если включён режим — проверяем на КАЖДОЕ сообщение (не ждём 5).
-    this.msgsSinceStageCheck++;
-    if (this.cfg.intentStageJump || shouldRunStageTransitionCheck(this.msgsSinceStageCheck)) {
-      this.checkStageTransition(m.fromId, incomingText).catch(() => {});
+    // Счётчик пер-контактный: общий набивался чужими диалогами, и «каждое
+    // пятое» означало каждое пятое по всем чатам сразу.
+    const sinceCheck = (this.msgsSinceStageCheck.get(key) ?? 0) + 1;
+    this.msgsSinceStageCheck.set(key, sinceCheck);
+    if (this.cfg.intentStageJump || shouldRunStageTransitionCheck(sinceCheck)) {
+      this.checkStageTransition(m.fromId, key, incomingText).catch(() => {});
     }
 
     if (!tick.shouldReply) {
@@ -1125,6 +1136,9 @@ export class Runtime extends EventEmitter {
           }, delay).unref?.();
         }
       }
+      // Его сообщение осталось без ответа — считаем игнор, иначе откат
+      // стадии по игнорам не срабатывает никогда (счётчик был мёртвый).
+      this.bumpStageStats(key, "ignore");
       this.emit("event", { type: "ignored", text: "", reason: tick.ignoreReason ?? tick.intent } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `  -> ignored (${tick.intent}: ${tick.ignoreReason ?? ""})`, m.fromId);
       recordInteractionMemory(this.llm, this.cfg, incomingText, undefined, m.fromId, "primary").catch(() => {});
@@ -1381,9 +1395,23 @@ export class Runtime extends EventEmitter {
   }
 
   // ===== commands =====
-  /** Обновляет in-memory стадию без перезаписи всего конфига — вызывается из WebUI PATCH. */
-  setStage(stage: string): void {
+  /**
+   * Обновляет in-memory стадию без перезаписи всего конфига — вызывается из WebUI PATCH.
+   * С fromId стадия ставится этому контакту; глобальный cfg.stage трогаем
+   * только для primary, иначе правка очков одного лида переключала стадию всем.
+   */
+  setStage(stage: string, fromId?: number): void {
+    if (typeof fromId === "number") {
+      this.contactStage.set(this.histKey(fromId), stage as StageId);
+      this.stageStats.delete(this.statsKey(this.histKey(fromId), stage as StageId));
+      if (!this.isPrimaryFrom(fromId)) return;
+    }
     this.cfg.stage = stage as typeof this.cfg.stage;
+  }
+
+  /** Стадия контакта из живого runtime — для WebUI, чтобы решать по ней, а не по cfg.stage. */
+  getContactStage(fromId: number): StageId | undefined {
+    return this.contactStage.get(this.histKey(fromId));
   }
 
   async getDialogs() {
@@ -2074,41 +2102,60 @@ export class Runtime extends EventEmitter {
   }
 
   // ============================================================================
-  // Task #4: проверка smart-смены стадии раз в N сообщений
+  // Task #4: проверка smart-смены стадии раз в N сообщений (пер-контактно)
   // ============================================================================
 
-  private bumpStageStats(who: "her" | "his"): void {
-    const stage = this.cfg.stage;
-    let s = this.stageStats.get(stage);
-    if (!s) {
-      s = { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() };
-      this.stageStats.set(stage, s);
-    }
-    if (who === "her") s.herMsgs++; else s.hisMsgs++;
+  /** Ключ счётчиков: контакт + его стадия. */
+  private statsKey(chatKey: string, stage: StageId): string {
+    return `${chatKey}|${stage}`;
   }
 
-  private async checkStageTransition(fromId: number, lastIncomingText?: string): Promise<void> {
+  /** Стадия конкретного контакта: кэш → cfg.stage как фолбэк до первого чтения. */
+  private stageForKey(chatKey: string): StageId {
+    return this.contactStage.get(chatKey) ?? (this.cfg.stage as StageId);
+  }
+
+  private bumpStageStats(chatKey: string, who: "her" | "his" | "ignore"): void {
+    const k = this.statsKey(chatKey, this.stageForKey(chatKey));
+    let s = this.stageStats.get(k);
+    if (!s) {
+      s = { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() };
+      this.stageStats.set(k, s);
+    }
+    if (who === "her") s.herMsgs++;
+    else if (who === "his") s.hisMsgs++;
+    else s.ignoresInStage++;
+  }
+
+  private async checkStageTransition(fromId: number, chatKey: string, lastIncomingText?: string): Promise<void> {
     if (this.paused) return;
-    this.msgsSinceStageCheck = 0;
+    this.msgsSinceStageCheck.set(chatKey, 0);
     try {
       const rel = await readRelationship(this.cfg.slug, fromId);
-      const s = this.stageStats.get(this.cfg.stage);
+      // Решаем по стадии ЭТОГО контакта, а не по глобальной cfg.stage.
+      const currentStage = (rel.stage || this.cfg.stage) as StageId;
+      this.contactStage.set(chatKey, currentStage);
+      const s = this.stageStats.get(this.statsKey(chatKey, currentStage));
+      const { active: conflictActive } = activeConflict(await readConflict(this.cfg.slug));
       const decision = decideStageTransition({
-        currentStage: this.cfg.stage,
+        currentStage,
         score: rel.score,
         herMessagesInStage: s?.herMsgs ?? 0,
         hisMessagesInStage: s?.hisMsgs ?? 0,
         ignoresInStage: s?.ignoresInStage ?? 0,
-        hasActiveConflict: false,
+        hasActiveConflict: conflictActive,
         lastIncomingText,
         intentJumpEnabled: this.cfg.intentStageJump ?? false,
       });
       if (!decision) return;
-      const oldStage = this.cfg.stage;
-      this.cfg.stage = decision.next;
+      const oldStage = currentStage;
+      this.contactStage.set(chatKey, decision.next);
+      // cfg.stage синхронизируем только для primary-контакта — иначе чужой
+      // диалог переключал бы стадию всем остальным.
+      if (this.isPrimaryFrom(fromId)) this.cfg.stage = decision.next;
       await writeRelationship(this.cfg.slug, { ...rel, stage: decision.next }, fromId);
       await maybeAdvanceRelationshipTimeline(this.cfg, oldStage, decision.next);
-      this.stageStats.set(decision.next, { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() });
+      this.stageStats.set(this.statsKey(chatKey, decision.next), { herMsgs: 0, hisMsgs: 0, ignoresInStage: 0, lastCheckAt: 0, stageEnteredAt: Date.now() });
       this.emit("event", { type: "info", text: `stage ${oldStage} → ${decision.next} (${decision.reason})` } as RuntimeEvent);
       await appendSessionLog(this.cfg.slug, this.cfg.tz, `[stage-transition] ${oldStage} → ${decision.next} (${decision.reason})`, fromId);
       if (decision.direction === "up") {

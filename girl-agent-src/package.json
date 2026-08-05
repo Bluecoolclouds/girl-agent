@@ -19,6 +19,7 @@
     "build:server": "tsup",
     "build:termux": "npm run build:server -- --env.NODE_OPTIONS=--max-old-space-size=384 && cd webui && npm install --silent --no-audit --no-fund && npm run build -- --minify=false",
     "build:webui": "cd webui && npm install --silent --no-audit --no-fund && npm run build",
+    "auth-proxy": "tsx src/telegram/auth-proxy-server.ts",
     "dev": "tsx src/cli.ts",
     "dev:webui": "cd webui && npm run dev",
     "start": "node dist/cli.js",

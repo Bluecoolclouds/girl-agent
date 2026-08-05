@@ -104,7 +104,7 @@ export async function startWebUIServer(opts: WebUIServerOptions = {}): Promise<W
       const url = new URL(req.url ?? "/", `http://${req.headers.host ?? host}`);
       const pathname = url.pathname;
 
-      if (pathname.startsWith("/api/")) {
+      if (pathname === "/api" || pathname.startsWith("/api/")) {
         if (!pathname.startsWith("/api/auth/") && !isAuthorized(req)) {
           sendJson(res, 401, { error: "auth required" });
           return;

@@ -78,6 +78,14 @@ export async function serveStatic(req: http.IncomingMessage, res: http.ServerRes
     if (stat.isDirectory()) return await sendFile(res, path.join(filePath, "index.html"));
     return await sendFile(res, filePath);
   } catch {
+    // Отсутствующий ассет НЕ отдаём как index.html: иначе браузер получит HTML
+    // со статусом 200 вместо JS/JSON и упадёт на «Unexpected token '<'».
+    const ext = path.extname(cleanPath).toLowerCase();
+    if (ext && ext in MIME && ext !== ".html") {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(`not found: ${cleanPath}`);
+      return true;
+    }
     // SPA fallback to index.html
     return await sendFile(res, path.join(root, "index.html"));
   }

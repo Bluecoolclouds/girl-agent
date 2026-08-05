@@ -1,6 +1,8 @@
 import { Router, HttpError } from "../http.js";
 import { remoteSendCode, remoteVerifyCode, remoteVerifyPassword, isNeeds2FA } from "../../telegram/remote-auth.js";
 import { userbotLogin } from "../../telegram/userbot.js";
+import { parseTelegramProxyInput } from "../../telegram/proxy-parse.js";
+import type { TelegramProxyConfig } from "../../types.js";
 
 /**
  * WebUI-эндпоинты для логина юзербота.
@@ -41,7 +43,7 @@ function randomId(): string {
 export function registerTgAuthRoutes(r: Router): void {
   // Remote proxy flow (по умолчанию)
   r.post("/api/tg/userbot/send-code", async ({ body }) => {
-    const { phone, useRemote, apiId, apiHash } = (body as { phone?: string; useRemote?: boolean; apiId?: number; apiHash?: string }) ?? {};
+    const { phone, useRemote, apiId, apiHash, proxy } = (body as { phone?: string; useRemote?: boolean; apiId?: number; apiHash?: string; proxy?: string | TelegramProxyConfig }) ?? {};
     if (!phone) throw new HttpError(400, "phone required");
     const useProxy = useRemote !== false; // по умолчанию proxy
     if (useProxy) {
@@ -50,6 +52,14 @@ export function registerTgAuthRoutes(r: Router): void {
     }
     // Свои creds: запускаем gramjs userbotLogin в фоне, ждём code/password через очередь.
     if (!apiId || !apiHash) throw new HttpError(400, "apiId/apiHash required for self-login");
+
+    // Прокси нужен уже здесь: client.start() идёт в Telegram напрямую, и при
+    // блокировке без прокси упрётся в таймаут ещё до отправки кода.
+    const proxyCfg = parseTelegramProxyInput(proxy ?? process.env.GIRL_AGENT_TG_PROXY);
+    if (!proxyCfg && typeof proxy === "string" && proxy.trim()) {
+      throw new HttpError(400, `Не понял строку прокси: «${proxy.trim()}». Ожидается tg://proxy?server=..&port=..&secret=.., socks5://[user:pass@]host:port, socks4://host:port или host:port`);
+    }
+
     const sessionId = randomId();
     let resolveCode: (s: string) => void = () => {};
     let resolvePass: (s: string) => void = () => {};
@@ -59,9 +69,26 @@ export function registerTgAuthRoutes(r: Router): void {
       apiId,
       apiHash,
       phone,
+      proxy: proxyCfg,
       promptCode: () => codeP,
       promptPassword: () => passP
     });
+    // Промис ждут только на шаге verify-code. Если он отклонится раньше и
+    // никто не слушает, Node ≥15 роняет процесс на unhandled rejection.
+    // Сам `done` при этом остаётся отклонённым, и ошибка доходит до UI.
+    void done.catch(() => {});
+
+    // Короткое окно перед ответом: при битых creds или прокси промис
+    // отклоняется сразу, и тогда «Код отправлен» — вранье. Если за окно
+    // ничего не упало, gramjs дошёл до promptCode, то есть код ушёл.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const early = await Promise.race([
+      done.then(() => null, (e: Error) => e),
+      new Promise<null>(res => { timer = setTimeout(() => res(null), 2500); })
+    ]);
+    if (timer) clearTimeout(timer);
+    if (early) throw new HttpError(400, `Не удалось отправить код: ${early.message}`);
+
     pending.set(sessionId, {
       resolve: resolveCode,
       resolvePass: resolvePass,
@@ -89,12 +116,21 @@ export function registerTgAuthRoutes(r: Router): void {
       // Race the done promise with a small delay: if done resolves quickly with sessionString,
       // login is complete; otherwise gramjs will request password via promptPassword.
       const result = await Promise.race([
-        p.done.then(s => ({ kind: "ok" as const, sessionString: s })),
+        p.done.then(
+          s => ({ kind: "ok" as const, sessionString: s }),
+          (e: Error) => ({ kind: "fail" as const, error: e })
+        ),
         new Promise<{ kind: "wait" }>(r => setTimeout(() => r({ kind: "wait" }), 4500))
       ]);
       if (result.kind === "ok") {
         pending.delete(sessionId);
         return { sessionString: result.sessionString, apiId: p.apiId, apiHash: p.apiHash };
+      }
+      // Неверный код или обрыв связи: без этой ветки отказ уходил в общий
+      // catch и приходил в UI как 500 с сырым текстом gramjs.
+      if (result.kind === "fail") {
+        pending.delete(sessionId);
+        throw new HttpError(400, `userbot login failed: ${result.error.message}`);
       }
       return { needs2fa: true, sessionId };
     }

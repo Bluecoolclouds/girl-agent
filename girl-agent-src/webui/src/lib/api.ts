@@ -99,12 +99,27 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined
   });
+  // Читаем текстом: если пришёл не-JSON (обычно index.html от SPA-fallback),
+  // нужно сообщить об этом внятно, а не молча вернуть null.
+  const raw = await res.text();
   let data: unknown = null;
-  try { data = await res.json(); } catch { /* may be empty */ }
+  let parsed = false;
+  if (raw.trim()) {
+    try { data = JSON.parse(raw); parsed = true; } catch { /* not json */ }
+  }
   if (!res.ok) {
-    const msg = (data as { error?: string } | null)?.error ?? `${res.status} ${res.statusText}`;
+    const msg = (parsed ? (data as { error?: string } | null)?.error : null) ?? `${res.status} ${res.statusText}`;
     if (res.status === 401 && msg === "auth required") throw new AuthRequiredError();
-    throw new ApiError(res.status, msg, data);
+    throw new ApiError(res.status, msg, parsed ? data : raw.slice(0, 300));
+  }
+  if (!parsed && raw.trim()) {
+    const ct = res.headers.get("content-type") ?? "unknown";
+    const head = raw.slice(0, 120).replace(/\s+/g, " ").trim();
+    throw new ApiError(
+      res.status,
+      `${method} ${path} → ${ct}, а не JSON: «${head}…». Похоже, backend на :3000 не запущен либо путь ушёл в SPA-fallback.`,
+      raw.slice(0, 300)
+    );
   }
   return data as T;
 }
@@ -243,7 +258,7 @@ export const api = {
   },
 
   // === Userbot login (Task #6, #13) ===
-  async tgSendCode(payload: { phone: string; useRemote?: boolean; apiId?: number; apiHash?: string }) {
+  async tgSendCode(payload: { phone: string; useRemote?: boolean; apiId?: number; apiHash?: string; proxy?: string }) {
     return req<{ method: "remote" | "self"; loginToken?: string; sessionId?: string }>(
       "POST", "/api/tg/userbot/send-code", payload
     );

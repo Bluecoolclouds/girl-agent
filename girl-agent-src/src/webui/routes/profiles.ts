@@ -4,11 +4,12 @@ import {
   readMd, writeMd, slugify, normalizeOwnerId, profileDir, readRelationship, writeRelationship, sessionDate,
   readSessionLog, listSessionDays, listDailySummaries, readDailySummary
 } from "../../storage/md.js";
-import type { ProfileConfig } from "../../types.js";
+import type { ProfileConfig, RelationshipScore, StageId } from "../../types.js";
 import { parseTelegramProxyInput } from "../../telegram/proxy-parse.js";
 import { bus } from "../runtime-bus.js";
 import { findStage } from "../../presets/stages.js";
 import { decideStageTransition } from "../../engine/stage-transitions.js";
+import { readConflict, activeConflict } from "../../engine/conflict.js";
 import { ensurePersonaPack, generatePersonaPack } from "../../engine/persona-gen.js";
 import { makeLLM } from "../../llm/index.js";
 import { applyLLMUpdate, describeLLM } from "../../config/llm-update.js";
@@ -198,7 +199,7 @@ export function registerProfileRoutes(r: Router): void {
     const cfg = await readConfig(slug);
     if (!cfg) throw new HttpError(404, "profile not found");
     const contactsDir = path.join(profileDir(slug), "contacts");
-    const contacts: { fromId: number; stage: string; score: Record<string, number>; isPrimary: boolean }[] = [];
+    const contacts: { fromId: number; stage: string; score: RelationshipScore; isPrimary: boolean }[] = [];
     try {
       const dirs = await fs.readdir(contactsDir, { withFileTypes: true });
       // Системные ID Telegram (службы, каналы, сервисные номера)
@@ -217,11 +218,14 @@ export function registerProfileRoutes(r: Router): void {
     return { contacts };
   });
 
-  r.get("/api/profiles/:slug/relationship", async ({ params, query }) => {
+  r.get("/api/profiles/:slug/relationship", async ({ params, searchParams }) => {
     const slug = params.slug ?? "";
     const cfg = await readConfig(slug);
     if (!cfg) throw new HttpError(404, "profile not found");
-    const fromId = query?.fromId ? Number(query.fromId) : (cfg.ownerId ?? undefined);
+    // В RouteContext нет query — было `query?.fromId`, всегда undefined,
+    // поэтому ручка отдавала primary-контакт независимо от ?fromId=.
+    const qFromId = Number(searchParams.get("fromId"));
+    const fromId = Number.isFinite(qFromId) && qFromId !== 0 ? qFromId : (cfg.ownerId ?? undefined);
     const rel = await readRelationship(slug, fromId);
     const stage = findStage(rel.stage || cfg.stage);
     return { stage: { id: stage.id, num: stage.num, label: stage.label }, score: rel.score };
@@ -242,17 +246,24 @@ export function registerProfileRoutes(r: Router): void {
     }
     // После ручного изменения очков — пересчитываем стадию.
     // Используем herMessagesInStage=999 чтобы не блокировать переход по минимуму сообщений.
+    // Стадию берём этого контакта (из живого runtime, если он запущен), а не глобальную.
+    const rt = bus.get(slug);
+    const liveStage = targetId !== undefined ? rt?.getContactStage(targetId) : undefined;
+    // Активный конфликт блокирует повышение — тот же гейт, что и в runtime,
+    // иначе ручная правка очков поднимала стадию посреди ссоры.
+    const { active: conflictActive } = activeConflict(await readConflict(slug));
     const transition = decideStageTransition({
-      currentStage: rel.stage as import("../../types.js").StageId,
+      currentStage: (liveStage ?? rel.stage ?? cfg.stage) as StageId,
       score: rel.score,
       herMessagesInStage: 999,
       hisMessagesInStage: 999,
       ignoresInStage: 0,
+      hasActiveConflict: conflictActive,
     });
     if (transition) {
       rel.stage = transition.next;
-      // Обновляем in-memory стадию в живом runtime (если запущен)
-      bus.get(slug)?.setStage(transition.next);
+      // Обновляем in-memory стадию в живом runtime (если запущен) — пер-контактно
+      if (targetId !== undefined) rt?.setStage(transition.next, targetId);
       // Если это primary контакт — синхронизируем config.json
       if (targetId === cfg.ownerId) {
         cfg.stage = transition.next as typeof cfg.stage;
